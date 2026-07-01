@@ -1024,247 +1024,212 @@
         });
 
         // 2. 即時讀取雲端資料庫並渲染所有列表與庫存數字
+        let snapshotRenderTimer = null; // 用於防抖動 (Debounce) 的計時器
+
         db.collection("inventory").orderBy("createdAt", "asc").onSnapshot((snapshot) => {
-            // 抓取畫面上所有的列表容器
-            const listGel = document.getElementById('list-detail-gel');
-            const listLash = document.getElementById('list-detail-lash');
-            const listNailConsumable = document.getElementById('list-detail-nail-consumable'); 
-            const listLashConsumable = document.getElementById('list-detail-lash-consumable');
-            
-            const stockGel = document.getElementById('stocktaking-gel');
-            const stockLash = document.getElementById('stocktaking-lash');
-            const stockNailConsumable = document.getElementById('stocktaking-nail-consumable');
-            const stockLashConsumable = document.getElementById('stocktaking-lash-consumable');
-            const listEquipment = document.getElementById('list-detail-equipment');
-            const listGeneral = document.getElementById('list-detail-general');
-            const stockEquipment = document.getElementById('stocktaking-equipment');
-            const stockGeneral = document.getElementById('stocktaking-general');
-
-            // 準備分類計數器與警告陣列
-            let counts = { gel: 0, nailConsumable: 0, lash: 0, lashConsumable: 0, equipment: 0, general: 0 };
-            let warnings = []; 
-            window.allInventoryData = []; // 儲存所有資料供即時搜尋使用
-
-            // 每次資料變動前先清空，避免重複疊加
-            if(listGel) listGel.innerHTML = '';
-            if(listLash) listLash.innerHTML = '';
-            if(listNailConsumable) listNailConsumable.innerHTML = '';
-            if(listLashConsumable) listLashConsumable.innerHTML = '';
-            if(stockGel) stockGel.innerHTML = '';
-            if(stockLash) stockLash.innerHTML = '';
-            if(stockNailConsumable) stockNailConsumable.innerHTML = '';
-            if(stockLashConsumable) stockLashConsumable.innerHTML = '';
-            if(listEquipment) listEquipment.innerHTML = '';
-            if(listGeneral) listGeneral.innerHTML = '';
-            if(stockEquipment) stockEquipment.innerHTML = '';
-            if(stockGeneral) stockGeneral.innerHTML = '';
-
-            // 走訪雲端裡的每一筆資料
+            // 第一步：每次雲端有變動，只在背後更新全域變數，【不立刻畫畫面】
+            window.allInventoryData = [];
             snapshot.forEach((doc) => {
                 const data = doc.data();
-                const id = doc.id;
-                
-                // 將資料存入全域陣列，供搜尋功能使用
-                data.id = id;
+                data.id = doc.id;
                 window.allInventoryData.push(data);
-                
-                // 檢查是否觸發安全庫存警告
-                const currentStock = parseInt(data['庫存']) || 0;
-                const safeStock = parseInt(data['安全庫存']) || 0;
-                let isWarning = false;
-                
-                // 只有當填寫了安全庫存，且目前庫存小於等於安全庫存時，才觸發警告 (嚴格判斷 !== undefined 以防數值 0 被忽略)
-                if (data['安全庫存'] !== undefined && data['安全庫存'] !== "" && currentStock <= safeStock) {
-                    isWarning = true;
-                    warnings.push({
-                        id: id,
-                        category: data.category,
-                        name: data['名稱'],
-                        channel: data['購買渠道'] || '未填寫渠道',
-                        stock: currentStock,
-                        safeStock: safeStock
-                    });
-                }
-
-                // 動態產生明細卡片裡的標籤 (排除掉不該作為 tag 顯示的欄位)
-                let tagsHtml = '';
-                for (const key in data) {
-                    if (['category', '名稱', '備註', '庫存', '安全庫存', 'createdAt'].includes(key)) continue;
-                    if (data[key]) {
-                        tagsHtml += `<span class="tag">${key}: ${data[key]}</span>`;
-                    }
-                }
-
-                const noteHtml = data['備註'] ? `<div class="detail-note">備註: ${data['備註']}</div>` : '';
-                
-                // 組合【庫存明細卡片】的 HTML
-                const detailCardHtml = `
-                    <div class="detail-card">
-                        <div class="detail-header">
-                            <div class="detail-title">${data['名稱']}</div>
-                            <div style="display: flex; gap: 8px; margin-left: 10px;">
-                                <!-- 複製圖示 -->
-                                <button class="edit-btn" onclick="copyItem('${id}')" title="複製">
-                                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-                                </button>
-                                <!-- 鉛筆圖示 (編輯) -->
-                                <button class="edit-btn" onclick="openEditPage('${id}')" title="編輯">
-                                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
-                                </button>
-                                <!-- 垃圾桶圖示 (刪除)，以紅色顯示 -->
-                                <button class="edit-btn" style="border-color: #d9534f; color: #d9534f;" onclick="deleteItem('${id}', '${data['名稱']}')" title="刪除">
-                                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-                                </button>
-                            </div>
-                        </div>
-                        <div class="detail-tags">${tagsHtml}</div>
-                        ${noteHtml}
-                        <div class="detail-stock">
-                            <span>目前庫存: ${data['庫存'] || 0}</span>
-                        </div>
-                    </div>
-                `;
-
-                // 判斷此項目本次開啟 App 時是否已經按過「打勾」確認
-                const isCounted = window.countedSet.has(id);
-                // order: 1 會讓 flex/grid 容器把此項目排到最後面
-                const orderStyle = isCounted ? 'order: 1;' : 'order: 0;';
-                const countedClass = isCounted ? 'counted-item' : '';
-                const checkBtnStyle = isCounted 
-                    ? 'background-color: #5cb85c; color: white; border: none;' 
-                    : 'background-color: transparent; border: 1px solid var(--white-sec); color: var(--white-sec);';
-
-                // 組合【盤點計數卡片】的 HTML (包含打勾確認按鈕)
-                const stocktakingCardHtml = `
-                    <div class="stocktaking-card ${countedClass}" style="${orderStyle}">
-                        <div style="display: flex; align-items: center; gap: 10px;">
-                            <button style="width: 28px; height: 28px; border-radius: 50%; font-weight: bold; cursor: pointer; display: flex; justify-content: center; align-items: center; transition: all 0.3s; ${checkBtnStyle}" 
-                                onclick="markAsCounted('${id}', '${data['名稱']}', ${data['庫存'] || 0})" title="標記為已盤點確認">✓</button>
-                            <h4>${data['名稱']}</h4>
-                        </div>
-                        <div class="item-action">
-                            <button class="qty-btn" onclick="updateStock('${id}', -1)">-</button>
-                            <span class="qty-num">${data['庫存'] || 0}</span>
-                            <button class="qty-btn" onclick="updateStock('${id}', 1)">+</button>
-                        </div>
-                    </div>
-                `;
-
-                // 根據該筆資料的 category 丟進對應的畫面容器並增加計數
-                if (data.category === 'gel') {
-                    counts.gel++;
-                    if(listGel) listGel.innerHTML += detailCardHtml;
-                    if(stockGel) stockGel.innerHTML += stocktakingCardHtml;
-                } else if (data.category === 'nail-consumable') {
-                    counts.nailConsumable++;
-                    if(listNailConsumable) listNailConsumable.innerHTML += detailCardHtml;
-                    if(stockNailConsumable) stockNailConsumable.innerHTML += stocktakingCardHtml;
-                } else if (data.category === 'lash') {
-                    counts.lash++;
-                    if(listLash) listLash.innerHTML += detailCardHtml;
-                    if(stockLash) stockLash.innerHTML += stocktakingCardHtml;
-                } else if (data.category === 'lash-consumable') {
-                    counts.lashConsumable++;
-                    if(listLashConsumable) listLashConsumable.innerHTML += detailCardHtml;
-                    if(stockLashConsumable) stockLashConsumable.innerHTML += stocktakingCardHtml;
-                } else if (data.category === 'equipment') {
-                    counts.equipment++;
-                    if(listEquipment) listEquipment.innerHTML += detailCardHtml;
-                    if(stockEquipment) stockEquipment.innerHTML += stocktakingCardHtml;
-                } else if (data.category === 'general-consumable') {
-                    counts.general++;
-                    if(listGeneral) listGeneral.innerHTML += detailCardHtml;
-                    if(stockGeneral) stockGeneral.innerHTML += stocktakingCardHtml;
-                }
             });
 
-            // 渲染庫存預警區塊
-            const warningArea = document.getElementById('dynamic-warning-area');
-            if (warningArea) {
-                if (warnings.length > 0) {
-                    // 定義分類名稱對照表，讓英文 ID 轉成中文標籤
-                    const categoryMap = {
-                        'gel': '凝膠',
-                        'nail-consumable': '美甲耗材',
-                        'lash': '睫毛',
-                        'lash-consumable': '美睫耗材',
-                        'equipment': '工具設備',
-                        'general-consumable': '一般消耗'
-                    };
+            // 如果目前停留在搜尋頁面，直接用新資料刷新搜尋結果
+            if (typeof window.executeSearch === 'function' && document.getElementById('page-search').classList.contains('active')) {
+                window.executeSearch();
+            }
 
-                    let warningItemsHtml = warnings.map(w => {
-                        const catName = categoryMap[w.category] || '其他';
-                        return `
-                            <div style="background: rgba(255,255,255,0.7); border-radius: 8px; padding: 12px; margin-bottom: 12px; border-left: 4px solid #d9534f; display: flex; justify-content: space-between; align-items: center;">
-                                <div>
-                                    <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 4px;">
-                                        <span style="background: #d9534f; color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: bold;">${catName}</span>
-                                        <span style="color: var(--white-main); font-weight: bold; font-size: 1rem;">${w.name}</span>
-                                    </div>
-                                    <div style="font-size: 0.85rem; color: var(--white-sec);">
-                                        目前: <span style="color: #d9534f; font-weight: bold; font-size: 1rem;">${w.stock}</span> / 安全水位: ${w.safeStock}
-                                        <br><span style="color: var(--gold-main);">渠道: ${w.channel}</span>
-                                    </div>
-                                </div>
-                                <div style="display: flex; gap: 6px; align-items: center;">
-                                    <!-- 快速 +1 按鈕 -->
-                                    <button onclick="updateStock('${w.id}', 1)" style="background: var(--gold-main); color: white; border: none; border-radius: 6px; width: 32px; height: 32px; font-size: 1.2rem; cursor: pointer; display: flex; justify-content: center; align-items: center;" title="快速補充+1">+</button>
-                                    <!-- 編輯按鈕 -->
-                                    <button onclick="openEditPage('${w.id}')" style="background: transparent; border: 1px solid var(--gold-main); color: var(--gold-main); border-radius: 6px; padding: 6px; cursor: pointer; display: flex; justify-content: center; align-items: center;" title="編輯">
-                                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
-                                    </button>
+            // 第二步：防抖機制 (Debounce) - 如果在 200 毫秒內連續變動(例如狂按加減)，就取消上一次的繪圖排程
+            if (snapshotRenderTimer) clearTimeout(snapshotRenderTimer);
+
+            // 設定 200 毫秒後才真正執行耗效能的 DOM 畫面重繪
+            snapshotRenderTimer = setTimeout(() => {
+                // 抓取畫面上所有的列表容器
+                const listGel = document.getElementById('list-detail-gel');
+                const listLash = document.getElementById('list-detail-lash');
+                const listNailConsumable = document.getElementById('list-detail-nail-consumable'); 
+                const listLashConsumable = document.getElementById('list-detail-lash-consumable');
+                const listEquipment = document.getElementById('list-detail-equipment');
+                const listGeneral = document.getElementById('list-detail-general');
+                
+                const stockGel = document.getElementById('stocktaking-gel');
+                const stockLash = document.getElementById('stocktaking-lash');
+                const stockNailConsumable = document.getElementById('stocktaking-nail-consumable');
+                const stockLashConsumable = document.getElementById('stocktaking-lash-consumable');
+                const stockEquipment = document.getElementById('stocktaking-equipment');
+                const stockGeneral = document.getElementById('stocktaking-general');
+
+                // 準備分類計數器與警告陣列
+                let counts = { gel: 0, nailConsumable: 0, lash: 0, lashConsumable: 0, equipment: 0, general: 0 };
+                let warnings = []; 
+
+                let htmlBuffers = {
+                    listGel: '', stockGel: '',
+                    listNailConsumable: '', stockNailConsumable: '',
+                    listLash: '', stockLash: '',
+                    listLashConsumable: '', stockLashConsumable: '',
+                    listEquipment: '', stockEquipment: '',
+                    listGeneral: '', stockGeneral: ''
+                };
+
+                // 走訪記憶體裡最新的資料
+                window.allInventoryData.forEach((data) => {
+                    const id = data.id;
+                    const currentStock = parseInt(data['庫存']) || 0;
+                    const safeStock = parseInt(data['安全庫存']) || 0;
+                    
+                    if (data['安全庫存'] !== undefined && data['安全庫存'] !== "" && currentStock <= safeStock) {
+                        warnings.push({
+                            id: id,
+                            category: data.category,
+                            name: data['名稱'],
+                            channel: data['購買渠道'] || '未填寫渠道',
+                            stock: currentStock,
+                            safeStock: safeStock
+                        });
+                    }
+
+                    let tagsHtml = '';
+                    for (const key in data) {
+                        if (['id', 'category', '名稱', '備註', '庫存', '安全庫存', 'createdAt', 'lastCheckedAt'].includes(key)) continue;
+                        if (data[key]) tagsHtml += `<span class="tag">${key}: ${data[key]}</span>`;
+                    }
+
+                    const noteHtml = data['備註'] ? `<div class="detail-note">備註: ${data['備註']}</div>` : '';
+                    
+                    // 【優化點】：給數量 span 加上特定 class (stock-text-xxx)，供樂觀更新使用
+                    const detailCardHtml = `
+                        <div class="detail-card">
+                            <div class="detail-header">
+                                <div class="detail-title">${data['名稱']}</div>
+                                <div class="admin-only" style="display: flex; gap: 8px; margin-left: 10px;">
+                                    <button class="edit-btn" onclick="copyItem('${id}')" title="複製"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button>
+                                    <button class="edit-btn" onclick="openEditPage('${id}')" title="編輯"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg></button>
+                                    <button class="edit-btn" style="border-color: #d9534f; color: #d9534f;" onclick="deleteItem('${id}', '${data['名稱']}')" title="刪除"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2-2v2"></path></svg></button>
                                 </div>
                             </div>
-                        `;
-                    }).join('');
-
-                    // 改變預警卡片的整體底色，使其看起來更有警示感
-                    warningArea.innerHTML = `
-                        <div class="warning-card" style="flex-direction: column; align-items: stretch; gap: 12px; background-color: rgba(217, 83, 79, 0.08); border-color: rgba(217, 83, 79, 0.3);">
-                            <div style="display: flex; justify-content: space-between; align-items: center;">
-                                <h3 style="color: #d9534f; margin:0; display: flex; align-items: center; gap: 6px;">
-                                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
-                                    庫存不足警告 (${warnings.length})
-                                </h3>
-                                <button class="warning-btn" style="background-color: #d9534f;" onclick="switchPage('page-stocktaking')">全部盤點</button>
-                            </div>
-                            <div style="margin-top: 8px;">
-                                ${warningItemsHtml}
+                            <div class="detail-tags">${tagsHtml}</div>
+                            ${noteHtml}
+                            <div class="detail-stock">
+                                <span>目前庫存: <span class="stock-text-${id}">${currentStock}</span></span>
                             </div>
                         </div>
                     `;
-                } else {
-                    warningArea.innerHTML = ''; // 如果沒有警告就清空區塊
+
+                    const isCounted = window.countedSet.has(id);
+                    const orderStyle = isCounted ? 'order: 1;' : 'order: 0;';
+                    const countedClass = isCounted ? 'counted-item' : '';
+                    const checkBtnStyle = isCounted ? 'background-color: #5cb85c; color: white; border: none;' : 'background-color: transparent; border: 1px solid var(--white-sec); color: var(--white-sec);';
+
+                    // 【優化點】：給數量 span 加上特定 class (stock-num-xxx)
+                    const stocktakingCardHtml = `
+                        <div class="stocktaking-card ${countedClass}" style="${orderStyle}">
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <button style="width: 28px; height: 28px; border-radius: 50%; font-weight: bold; cursor: pointer; display: flex; justify-content: center; align-items: center; transition: all 0.3s; ${checkBtnStyle}" 
+                                    onclick="markAsCounted('${id}', '${data['名稱']}', ${currentStock})" title="標記為已盤點確認">✓</button>
+                                <h4>${data['名稱']}</h4>
+                            </div>
+                            <div class="item-action">
+                                <button class="qty-btn" onclick="updateStock('${id}', -1)">-</button>
+                                <span class="qty-num stock-num-${id}">${currentStock}</span>
+                                <button class="qty-btn" onclick="updateStock('${id}', 1)">+</button>
+                            </div>
+                        </div>
+                    `;
+
+                    if (data.category === 'gel') { counts.gel++; htmlBuffers.listGel += detailCardHtml; htmlBuffers.stockGel += stocktakingCardHtml; } 
+                    else if (data.category === 'nail-consumable') { counts.nailConsumable++; htmlBuffers.listNailConsumable += detailCardHtml; htmlBuffers.stockNailConsumable += stocktakingCardHtml; } 
+                    else if (data.category === 'lash') { counts.lash++; htmlBuffers.listLash += detailCardHtml; htmlBuffers.stockLash += stocktakingCardHtml; } 
+                    else if (data.category === 'lash-consumable') { counts.lashConsumable++; htmlBuffers.listLashConsumable += detailCardHtml; htmlBuffers.stockLashConsumable += stocktakingCardHtml; } 
+                    else if (data.category === 'equipment') { counts.equipment++; htmlBuffers.listEquipment += detailCardHtml; htmlBuffers.stockEquipment += stocktakingCardHtml; } 
+                    else if (data.category === 'general-consumable') { counts.general++; htmlBuffers.listGeneral += detailCardHtml; htmlBuffers.stockGeneral += stocktakingCardHtml; }
+                });
+
+                // 一次性寫入 DOM
+                if(listGel) listGel.innerHTML = htmlBuffers.listGel;
+                if(listNailConsumable) listNailConsumable.innerHTML = htmlBuffers.listNailConsumable;
+                if(listLash) listLash.innerHTML = htmlBuffers.listLash;
+                if(listLashConsumable) listLashConsumable.innerHTML = htmlBuffers.listLashConsumable;
+                if(listEquipment) listEquipment.innerHTML = htmlBuffers.listEquipment;
+                if(listGeneral) listGeneral.innerHTML = htmlBuffers.listGeneral;
+                
+                if(stockGel) stockGel.innerHTML = htmlBuffers.stockGel;
+                if(stockNailConsumable) stockNailConsumable.innerHTML = htmlBuffers.stockNailConsumable;
+                if(stockLash) stockLash.innerHTML = htmlBuffers.stockLash;
+                if(stockLashConsumable) stockLashConsumable.innerHTML = htmlBuffers.stockLashConsumable;
+                if(stockEquipment) stockEquipment.innerHTML = htmlBuffers.stockEquipment;
+                if(stockGeneral) stockGeneral.innerHTML = htmlBuffers.stockGeneral;
+
+                // 渲染庫存預警區塊
+                const warningArea = document.getElementById('dynamic-warning-area');
+                if (warningArea) {
+                    if (warnings.length > 0) {
+                        const categoryMap = { 'gel': '凝膠', 'nail-consumable': '美甲耗材', 'lash': '睫毛', 'lash-consumable': '美睫耗材', 'equipment': '工具設備', 'general-consumable': '一般消耗' };
+                        let warningItemsHtml = warnings.map(w => {
+                            return `
+                                <div style="background: rgba(255,255,255,0.7); border-radius: 8px; padding: 12px; margin-bottom: 12px; border-left: 4px solid #d9534f; display: flex; justify-content: space-between; align-items: center;">
+                                    <div>
+                                        <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 4px;">
+                                            <span style="background: #d9534f; color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: bold;">${categoryMap[w.category] || '其他'}</span>
+                                            <span style="color: var(--white-main); font-weight: bold; font-size: 1rem;">${w.name}</span>
+                                        </div>
+                                        <div style="font-size: 0.85rem; color: var(--white-sec);">
+                                            目前: <span style="color: #d9534f; font-weight: bold; font-size: 1rem;" class="stock-text-${w.id}">${w.stock}</span> / 安全水位: ${w.safeStock}
+                                            <br><span style="color: var(--gold-main);">渠道: ${w.channel}</span>
+                                        </div>
+                                    </div>
+                                    <div style="display: flex; gap: 6px; align-items: center;">
+                                        <button onclick="updateStock('${w.id}', 1)" style="background: var(--gold-main); color: white; border: none; border-radius: 6px; width: 32px; height: 32px; font-size: 1.2rem; cursor: pointer; display: flex; justify-content: center; align-items: center;" title="快速補充+1">+</button>
+                                        <button onclick="openEditPage('${w.id}')" style="background: transparent; border: 1px solid var(--gold-main); color: var(--gold-main); border-radius: 6px; padding: 6px; cursor: pointer; display: flex; justify-content: center; align-items: center;" title="編輯"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg></button>
+                                    </div>
+                                </div>
+                            `;
+                        }).join('');
+
+                        window.toggleWarningList = function() {
+                            const list = document.getElementById('warning-details');
+                            const icon = document.getElementById('warning-toggle-icon');
+                            if (list.style.display === 'none') { list.style.display = 'block'; icon.innerText = '▲'; } 
+                            else { list.style.display = 'none'; icon.innerText = '▼'; }
+                        };
+
+                        warningArea.innerHTML = `
+                            <div class="warning-card" style="flex-direction: column; align-items: stretch; gap: 12px; background-color: rgba(217, 83, 79, 0.08); border-color: rgba(217, 83, 79, 0.3);">
+                                <div style="display: flex; justify-content: space-between; align-items: center; cursor: pointer;" onclick="toggleWarningList()">
+                                    <h3 style="color: #d9534f; margin:0; display: flex; align-items: center; gap: 6px;">
+                                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                                        庫存不足警告 (${warnings.length}項)
+                                        <span id="warning-toggle-icon" style="font-size: 0.8rem; margin-left: 4px;">▼</span>
+                                    </h3>
+                                    <button class="warning-btn" style="background-color: #d9534f; padding: 6px 12px;" onclick="event.stopPropagation(); switchPage('page-stocktaking')">全部盤點</button>
+                                </div>
+                                <div id="warning-details" style="display: none; margin-top: 8px; border-top: 1px dashed rgba(217,83,79,0.3); padding-top: 12px;">
+                                    ${warningItemsHtml}
+                                </div>
+                            </div>
+                        `;
+                    } else {
+                        warningArea.innerHTML = ''; 
+                    }
                 }
-            }
 
-            // 更新畫面上所有的庫存數字
-            const updateCountText = (elId, num) => {
-                const el = document.getElementById(elId);
-                if (el) el.innerText = num + ' 項庫存';
-            };
+                // 更新首頁與子分類計數
+                const updateCountText = (elId, num) => { const el = document.getElementById(elId); if (el) el.innerText = num + ' 項庫存'; };
+                updateCountText('count-main-nail', counts.gel + counts.nailConsumable);
+                updateCountText('count-main-lash', counts.lash + counts.lashConsumable);
+                updateCountText('count-main-equipment', counts.equipment);
+                updateCountText('count-main-general', counts.general);
+                updateCountText('count-gel', counts.gel);
+                updateCountText('count-nail-consumable', counts.nailConsumable);
+                updateCountText('count-lash', counts.lash);
+                updateCountText('count-lash-consumable', counts.lashConsumable);
 
-            // 首頁四大類更新
-            updateCountText('count-main-nail', counts.gel + counts.nailConsumable);
-            updateCountText('count-main-lash', counts.lash + counts.lashConsumable);
-            updateCountText('count-main-equipment', counts.equipment);
-            updateCountText('count-main-general', counts.general);
-
-            // 子頁面細項更新
-            updateCountText('count-gel', counts.gel);
-            updateCountText('count-nail-consumable', counts.nailConsumable);
-            updateCountText('count-lash', counts.lash);
-            updateCountText('count-lash-consumable', counts.lashConsumable);
-            
-            // 若目前停留在搜尋頁面，資料更新時自動同步刷新搜尋結果
-            if (typeof window.executeSearch === 'function') {
-                window.executeSearch();
-            }
-            
-            // 隨時驗證盤點完成進度 (防呆：確保載入資料後才浮現完成按鈕)
-            if (typeof window.checkAllCountedStatus === 'function') {
-                window.checkAllCountedStatus();
-            }
+                // 隨時驗證盤點完成進度
+                if (typeof window.checkAllCountedStatus === 'function') {
+                    window.checkAllCountedStatus();
+                }
+            }, 200); // 防抖結束
         });
 
         // 定義全域函數：刪除雲端資料庫中的項目
@@ -1336,7 +1301,7 @@
                         <div class="detail-tags">${tagsHtml}</div>
                         ${noteHtml}
                         <div class="detail-stock">
-                            <span>目前庫存: ${data['庫存'] || 0}</span>
+                            <span>目前庫存: <span class="stock-text-${data.id}">${data['庫存'] || 0}</span></span>
                         </div>
                     </div>
                 `;
@@ -1401,6 +1366,9 @@
 
         // 4. 將新增的商品資料寫入 Firebase 雲端資料庫
         submitBtn.addEventListener('click', () => {
+            // 防呆機制：鎖定按鈕避免連點造成重複新增
+            if (submitBtn.disabled) return;
+
             try {
                 const category = categorySelect.value;
                 const inputs = dynamicFields.querySelectorAll('.form-input');
@@ -1437,6 +1405,12 @@
                     return;
                 }
 
+                // 通過驗證，開始寫入前鎖定按鈕
+                const originalText = submitBtn.innerText;
+                submitBtn.disabled = true;
+                submitBtn.innerText = '處理中...';
+                submitBtn.style.opacity = '0.7';
+
                 // 【重點】如果是睫毛，自動組合名稱欄位
                 if (category === 'lash') {
                     const type = newItem['種類'] || '';
@@ -1451,30 +1425,27 @@
                 .then((docRef) => {
                     alert(`成功新增：${newItem['名稱']}`);
                     
-                    // 僅清空「庫存」欄位，其餘保留原值
-                    inputs.forEach(input => {
-                        const parentDiv = input.closest('.form-group');
-                        if (parentDiv) {
-                            const labelElement = parentDiv.querySelector('label');
-                            if (labelElement) {
-                                const labelName = labelElement.innerText.replace(' (非必填)', '').trim();
-                                if (labelName === '庫存') {
-                                    input.value = ''; 
-                                }
-                            }
-                        }
-                    });
+                    // 依據您的需求：確認新增後所有資料保留，都不清空
+                    // (已移除原先清空庫存欄位的程式碼)
                     
                     document.getElementById('page-add').scrollTo({ top: 0, behavior: 'smooth' });
                     
                 }).catch((error) => {
                     // 捕捉權限不足等 Firebase 錯誤
                     alert("寫入失敗，遭雲端拒絕：" + error.message);
+                }).finally(() => {
+                    // 無論成功失敗，最後都解開按鈕鎖定
+                    submitBtn.disabled = false;
+                    submitBtn.innerText = originalText;
+                    submitBtn.style.opacity = '1';
                 });
 
             } catch (err) {
                 // 捕捉任何 JavaScript 隱藏錯誤
                 alert("程式執行發生嚴重錯誤：" + err.message);
+                submitBtn.disabled = false;
+                submitBtn.innerText = '確認新增';
+                submitBtn.style.opacity = '1';
             }
         });
 
@@ -1617,7 +1588,13 @@
             db.collection("inventory").doc(currentEditId).update(updateItem)
             .then(() => {
                 alert("資料修改成功！"); // 編輯成功的提示
-                switchPage('page-home');
+                
+                // 改為跳轉回原本的分類明細列表，不跳回首頁
+                let targetPage = 'page-detail-' + currentEditCategory;
+                if (currentEditCategory === 'general-consumable') {
+                    targetPage = 'page-detail-general';
+                }
+                switchPage(targetPage);
             })
             .catch((error) => {
                 alert("發生錯誤：" + error.message);
@@ -1998,36 +1975,50 @@
         // 庫存盤點加減功能 與 觸發推播邏輯
         // ==========================================
         window.updateStock = function(docId, change) {
-            const docRef = db.collection("inventory").doc(docId);
+            // 【終極防卡頓優化】：樂觀 UI 更新 (Optimistic UI Update)
+            // 點擊瞬間直接修改畫面數字與全域變數，完全不等待 Firebase 讀取！
+            let newStock = 0;
+            let itemName = "未知項目";
+            let safeStock = 0;
             
-            docRef.get().then((doc) => {
-                if (doc.exists) {
-                    const data = doc.data();
-                    let currentStock = parseInt(data['庫存']) || 0;
-                    let safeStock = parseInt(data['安全庫存']); 
-                    
-                    let newStock = currentStock + change;
-                    if (newStock < 0) newStock = 0; // 避免庫存變成負數
-                    
-                    docRef.update({ '庫存': newStock }).then(() => {
-                        // 寫入庫存變動歷史紀錄
-                        db.collection("inventory_history").add({
-                            itemId: docId,
-                            itemName: data['名稱'],
-                            changeAmount: change,
-                            newStock: newStock,
-                            user: currentUser ? currentUser.email : '未登入訪客',
-                            reason: '盤點異動',
-                            timestamp: firebase.firestore.FieldValue.serverTimestamp()
-                        });
+            // 1. 從記憶體中尋找該商品，同步計算新數字
+            const itemIndex = window.allInventoryData.findIndex(i => i.id === docId);
+            if (itemIndex > -1) {
+                let currentStock = parseInt(window.allInventoryData[itemIndex]['庫存']) || 0;
+                newStock = currentStock + change;
+                if (newStock < 0) newStock = 0; // 避免扣到變負數
+                
+                // 立即寫回記憶體，防止連續點擊時數字錯亂
+                window.allInventoryData[itemIndex]['庫存'] = newStock;
+                itemName = window.allInventoryData[itemIndex]['名稱'];
+                safeStock = parseInt(window.allInventoryData[itemIndex]['安全庫存']);
+            } else {
+                return; // 找不到資料就中斷
+            }
 
-                        // 判斷推播條件：有設定安全庫存、且是「扣除」動作、且剛好跌破安全水位
-                        if (!isNaN(safeStock) && change < 0) {
-                            if (currentStock > safeStock && newStock <= safeStock) {
-                                sendLocalPush("⚠️ 庫存不足警告", `「${data['名稱']}」只剩 ${newStock} 個，已達安全水位需補貨！`);
-                            }
-                        }
-                    });
+            // 2. 瞬間修改畫面上所有對應此 ID 的數字 (搜尋列表、明細卡片、盤點卡片、警告卡片)
+            document.querySelectorAll(`.stock-num-${docId}`).forEach(el => el.innerText = newStock);
+            document.querySelectorAll(`.stock-text-${docId}`).forEach(el => el.innerText = newStock);
+
+            // 3. 背景非同步更新到 Firebase (移除原本非常耗時的 docRef.get() 動作)
+            const docRef = db.collection("inventory").doc(docId);
+            docRef.update({ '庫存': newStock }).then(() => {
+                // 背景寫入歷史紀錄
+                db.collection("inventory_history").add({
+                    itemId: docId,
+                    itemName: itemName,
+                    changeAmount: change,
+                    newStock: newStock,
+                    user: currentUser ? currentUser.email : '未登入訪客',
+                    reason: '盤點異動',
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                });
+
+                // 判斷是否需要推播警告
+                if (!isNaN(safeStock) && change < 0) {
+                    if (newStock <= safeStock && (newStock - change) > safeStock) {
+                        sendLocalPush("⚠️ 庫存不足警告", `「${itemName}」只剩 ${newStock} 個，已達安全水位需補貨！`);
+                    }
                 }
             });
         };
