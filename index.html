@@ -1077,9 +1077,9 @@
                 window.allInventoryData.forEach((data) => {
                     const id = data.id;
                     const currentStock = parseInt(data['庫存']) || 0;
-                    const safeStock = parseInt(data['安全庫存']) || 0;
+                    const safeStock = parseInt(data['庫存標準']) || 0;
                     
-                    if (data['安全庫存'] !== undefined && data['安全庫存'] !== "" && currentStock <= safeStock) {
+                    if (data['庫存標準'] !== undefined && data['庫存標準'] !== "" && currentStock <= safeStock) {
                         warnings.push({
                             id: id,
                             category: data.category,
@@ -1092,7 +1092,7 @@
 
                     let tagsHtml = '';
                     for (const key in data) {
-                        if (['id', 'category', '名稱', '備註', '庫存', '安全庫存', 'createdAt', 'lastCheckedAt'].includes(key)) continue;
+                        if (['id', 'category', '名稱', '備註', '庫存', '庫存標準', 'createdAt', 'lastCheckedAt'].includes(key)) continue;
                         if (data[key]) tagsHtml += `<span class="tag">${key}: ${data[key]}</span>`;
                     }
 
@@ -1175,7 +1175,7 @@
                                             <span style="color: var(--white-main); font-weight: bold; font-size: 1rem;">${w.name}</span>
                                         </div>
                                         <div style="font-size: 0.85rem; color: var(--white-sec);">
-                                            目前: <span style="color: #d9534f; font-weight: bold; font-size: 1rem;" class="stock-text-${w.id}">${w.stock}</span> / 安全水位: ${w.safeStock}
+                                            目前: <span style="color: #d9534f; font-weight: bold; font-size: 1rem;" class="stock-text-${w.id}">${w.stock}</span> / 庫存標準: ${w.safeStock}
                                             <br><span style="color: var(--gold-main);">渠道: ${w.channel}</span>
                                         </div>
                                     </div>
@@ -1275,7 +1275,7 @@
             filteredData.forEach(data => {
                 let tagsHtml = '';
                 for (const key in data) {
-                    if (['id', 'category', '名稱', '備註', '庫存', '安全庫存', 'createdAt', 'lastCheckedAt'].includes(key)) continue;
+                    if (['id', 'category', '名稱', '備註', '庫存', '庫存標準', 'createdAt', 'lastCheckedAt'].includes(key)) continue;
                     if (data[key]) {
                         tagsHtml += `<span class="tag">${key}: ${data[key]}</span>`;
                     }
@@ -1327,7 +1327,7 @@
                     <div class="form-group"><label>價格</label><input type="number" class="form-input" required></div>
                     <div class="form-group"><label>購買渠道</label><input type="text" class="form-input"></div>
                     <div class="form-group"><label>庫存</label><input type="number" class="form-input" required></div>
-                    <div class="form-group"><label>安全庫存 (非必填)</label><input type="number" class="form-input" placeholder="低於此數字會警告"></div>
+                    <div class="form-group"><label>庫存標準 (非必填)</label><input type="number" class="form-input" placeholder="低於此數字會警告"></div>
                     <div class="form-group"><label>有無中標</label><select class="form-input"><option>有</option><option>無</option></select></div>
                     <div class="form-group"><label>備註 (非必填)</label><input type="text" class="form-input"></div>
                 `;
@@ -1341,7 +1341,7 @@
                     <div class="form-group"><label>價格</label><input type="number" class="form-input"></div>
                     <div class="form-group"><label>購買渠道</label><input type="text" class="form-input"></div>
                     <div class="form-group"><label>庫存</label><input type="number" class="form-input" required></div>
-                    <div class="form-group"><label>安全庫存 (非必填)</label><input type="number" class="form-input" placeholder="低於此數字會警告"></div>
+                    <div class="form-group"><label>庫存標準 (非必填)</label><input type="number" class="form-input" placeholder="低於此數字會警告"></div>
                     <div class="form-group"><label>備註 (非必填)</label><input type="text" class="form-input"></div>
                 `;
                 submitBtn.style.display = 'block';
@@ -1353,7 +1353,7 @@
                     <div class="form-group"><label>價格</label><input type="number" class="form-input" required></div>
                     <div class="form-group"><label>購買渠道 (非必填)</label><input type="text" class="form-input"></div>
                     <div class="form-group"><label>庫存</label><input type="number" class="form-input" required></div>
-                    <div class="form-group"><label>安全庫存 (非必填)</label><input type="number" class="form-input" placeholder="低於此數字會警告"></div>
+                    <div class="form-group"><label>庫存標準 (非必填)</label><input type="number" class="form-input" placeholder="低於此數字會警告"></div>
                     <div class="form-group"><label>備註 (非必填)</label><input type="text" class="form-input"></div>
                 `;
                 submitBtn.style.display = 'block';
@@ -1468,7 +1468,7 @@
                         if (!parentDiv) return;
                         const labelName = parentDiv.querySelector('label').innerText.replace(' (非必填)', '').trim();
                         // 排除庫存跟備註，其他有值的都帶過去
-                        if (!['庫存', '安全庫存', '備註'].includes(labelName) && data[labelName] !== undefined) {
+                        if (!['庫存', '庫存標準', '備註'].includes(labelName) && data[labelName] !== undefined) {
                             input.value = data[labelName];
                         }
                     });
@@ -1501,7 +1501,7 @@
                             <div class="form-group"><label>價格</label><input type="number" class="form-input" required value="${getValue('價格')}"></div>
                             <div class="form-group"><label>購買渠道</label><input type="text" class="form-input" value="${getValue('購買渠道')}"></div>
                             <div class="form-group"><label>庫存</label><input type="number" class="form-input" required value="${getValue('庫存')}"></div>
-                            <div class="form-group"><label>安全庫存 (非必填)</label><input type="number" class="form-input" placeholder="低於此數字會警告" value="${getValue('安全庫存')}"></div>
+                            <div class="form-group"><label>庫存標準 (非必填)</label><input type="number" class="form-input" placeholder="低於此數字會警告" value="${getValue('庫存標準')}"></div>
                             <div class="form-group"><label>有無中標</label><select class="form-input" id="edit-select-label"><option>有</option><option>無</option></select></div>
                             <div class="form-group"><label>備註 (非必填)</label><input type="text" class="form-input" value="${getValue('備註')}"></div>
                         `;
@@ -1514,7 +1514,7 @@
                             <div class="form-group"><label>價格</label><input type="number" class="form-input" value="${getValue('價格')}"></div>
                             <div class="form-group"><label>購買渠道</label><input type="text" class="form-input" value="${getValue('購買渠道')}"></div>
                             <div class="form-group"><label>庫存</label><input type="number" class="form-input" required value="${getValue('庫存')}"></div>
-                            <div class="form-group"><label>安全庫存 (非必填)</label><input type="number" class="form-input" placeholder="低於此數字會警告" value="${getValue('安全庫存')}"></div>
+                            <div class="form-group"><label>庫存標準 (非必填)</label><input type="number" class="form-input" placeholder="低於此數字會警告" value="${getValue('庫存標準')}"></div>
                             <div class="form-group"><label>備註 (非必填)</label><input type="text" class="form-input" value="${getValue('備註')}"></div>
                         `;
                     } else {
@@ -1525,7 +1525,7 @@
                             <div class="form-group"><label>價格</label><input type="number" class="form-input" required value="${getValue('價格')}"></div>
                             <div class="form-group"><label>購買渠道 (非必填)</label><input type="text" class="form-input" value="${getValue('購買渠道')}"></div>
                             <div class="form-group"><label>庫存</label><input type="number" class="form-input" required value="${getValue('庫存')}"></div>
-                            <div class="form-group"><label>安全庫存 (非必填)</label><input type="number" class="form-input" placeholder="低於此數字會警告" value="${getValue('安全庫存')}"></div>
+                            <div class="form-group"><label>庫存標準 (非必填)</label><input type="number" class="form-input" placeholder="低於此數字會警告" value="${getValue('庫存標準')}"></div>
                             <div class="form-group"><label>備註 (非必填)</label><input type="text" class="form-input" value="${getValue('備註')}"></div>
                         `;
                     }
@@ -1739,10 +1739,10 @@
         window.exportToCSV = async function() {
             try {
                 const snapshot = await db.collection("inventory").get();
-                let csvContent = "\uFEFF分類,名稱,品牌,價格,目前庫存,安全庫存,購買渠道\n";
+                let csvContent = "\uFEFF分類,名稱,品牌,價格,目前庫存,庫存標準,購買渠道\n";
                 snapshot.forEach(doc => {
                     const data = doc.data();
-                    csvContent += `${data.category || ''},${data['名稱'] || ''},${data['品牌'] || ''},${data['價格'] || ''},${data['庫存'] || 0},${data['安全庫存'] || ''},${data['購買渠道'] || ''}\n`;
+                    csvContent += `${data.category || ''},${data['名稱'] || ''},${data['品牌'] || ''},${data['價格'] || ''},${data['庫存'] || 0},${data['庫存標準'] || ''},${data['購買渠道'] || ''}\n`;
                 });
                 downloadBlob(csvContent, '繆米美學_目前庫存狀態.csv', 'text/csv;charset=utf-8;');
             } catch (error) {
@@ -1991,7 +1991,7 @@
                 // 立即寫回記憶體，防止連續點擊時數字錯亂
                 window.allInventoryData[itemIndex]['庫存'] = newStock;
                 itemName = window.allInventoryData[itemIndex]['名稱'];
-                safeStock = parseInt(window.allInventoryData[itemIndex]['安全庫存']);
+                safeStock = parseInt(window.allInventoryData[itemIndex]['庫存標準']);
             } else {
                 return; // 找不到資料就中斷
             }
@@ -2017,7 +2017,7 @@
                 // 判斷是否需要推播警告
                 if (!isNaN(safeStock) && change < 0) {
                     if (newStock <= safeStock && (newStock - change) > safeStock) {
-                        sendLocalPush("⚠️ 庫存不足警告", `「${itemName}」只剩 ${newStock} 個，已達安全水位需補貨！`);
+                        sendLocalPush("⚠️ 庫存不足警告", `「${itemName}」只剩 ${newStock} 個，已達庫存標準需補貨！`);
                     }
                 }
             });
