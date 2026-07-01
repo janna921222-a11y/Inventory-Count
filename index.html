@@ -1099,9 +1099,14 @@
 
                     const noteHtml = data['備註'] ? `<div class="detail-note">備註: ${data['備註']}</div>` : '';
                     
+                    // 判斷是否低於庫存標準，並設定警告樣式與標籤
+                    const isLowStock = (data['庫存標準'] !== undefined && data['庫存標準'] !== "" && currentStock <= safeStock);
+                    const alertStyle = isLowStock ? 'border-color: rgba(217,83,79,0.4); border-left: 4px solid #d9534f; background-color: rgba(217, 83, 79, 0.04);' : '';
+                    const alertTag = isLowStock ? '<span class="tag tag-alert" style="font-weight:bold;">⚠️ 庫存不足</span>' : '';
+
                     // 【優化點】：給數量 span 加上特定 class (stock-text-xxx)，供樂觀更新使用
                     const detailCardHtml = `
-                        <div class="detail-card">
+                        <div class="detail-card" style="${alertStyle}">
                             <div class="detail-header">
                                 <div class="detail-title">${data['名稱']}</div>
                                 <div class="admin-only" style="display: flex; gap: 8px; margin-left: 10px;">
@@ -1110,7 +1115,7 @@
                                     <button class="edit-btn" style="border-color: #d9534f; color: #d9534f;" onclick="deleteItem('${id}', '${data['名稱']}')" title="刪除"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2-2v2"></path></svg></button>
                                 </div>
                             </div>
-                            <div class="detail-tags">${tagsHtml}</div>
+                            <div class="detail-tags">${alertTag}${tagsHtml}</div>
                             ${noteHtml}
                             <div class="detail-stock">
                                 <span>目前庫存: <span class="stock-text-${id}">${currentStock}</span></span>
@@ -1284,8 +1289,15 @@
                 }
                 const noteHtml = data['備註'] ? `<div class="detail-note">備註: ${data['備註']}</div>` : '';
                 
+                // 判斷搜尋結果是否低於庫存標準，並設定警告樣式與標籤
+                const currentStock = parseInt(data['庫存']) || 0;
+                const safeStock = parseInt(data['庫存標準']) || 0;
+                const isLowStock = (data['庫存標準'] !== undefined && data['庫存標準'] !== "" && currentStock <= safeStock);
+                const alertStyle = isLowStock ? 'border-color: rgba(217,83,79,0.4); border-left: 4px solid #d9534f; background-color: rgba(217, 83, 79, 0.04);' : '';
+                const alertTag = isLowStock ? '<span class="tag tag-alert" style="font-weight:bold;">⚠️ 庫存不足</span>' : '';
+                
                 const cardHtml = `
-                    <div class="detail-card">
+                    <div class="detail-card" style="${alertStyle}">
                         <div class="detail-header">
                             <div class="detail-title">${data['名稱']}</div>
                             <div class="admin-only" style="display: flex; gap: 8px; margin-left: 10px;">
@@ -1300,7 +1312,7 @@
                                 </button>
                             </div>
                         </div>
-                        <div class="detail-tags">${tagsHtml}</div>
+                        <div class="detail-tags">${alertTag}${tagsHtml}</div>
                         ${noteHtml}
                         <div class="detail-stock">
                             <span>目前庫存: <span class="stock-text-${data.id}">${data['庫存'] || 0}</span></span>
@@ -1456,6 +1468,7 @@
         // 5. 完善編輯功能：讀取資料並畫出編輯表單
         let currentEditId = null;
         let currentEditCategory = null;
+        let savedScrollPosition = 0; // 新增變數用來記錄捲動位置
 
         // 這是新加的複製功能
         window.copyItem = function(docId) {
@@ -1486,6 +1499,9 @@
         };
 
         window.openEditPage = function(docId) {
+            // 點擊編輯時，先記錄當下的螢幕捲動高度
+            savedScrollPosition = window.scrollY || document.documentElement.scrollTop;
+            
             db.collection("inventory").doc(docId).get().then((doc) => {
                 if (doc.exists) {
                     const data = doc.data();
@@ -1603,6 +1619,11 @@
                     targetPage = 'page-detail-general';
                 }
                 switchPage(targetPage);
+                
+                // 畫面切換後，把捲軸拉回剛剛記錄的位置 (加一點延遲確保畫面已經切換完畢)
+                setTimeout(() => {
+                    window.scrollTo({ top: savedScrollPosition, behavior: 'instant' });
+                }, 10);
             })
             .catch((error) => {
                 alert("發生錯誤：" + error.message);
@@ -2484,5 +2505,3 @@
     </script>
 </body>
 </html>
-
-為甚麼庫存警告跑不出來 而且我原先設定的庫存標準也不見了
