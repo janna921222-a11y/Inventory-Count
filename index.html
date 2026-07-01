@@ -1441,9 +1441,9 @@
                 if (category === 'lash') {
                     const type = newItem['種類'] || '';
                     const thick = newItem['粗細度'] || '';
-                    const length = newItem['長度'] || '';
                     const curl = newItem['捲度'] || '';
-                    newItem['名稱'] = `${type} ${thick} ${length} ${curl}`.trim();
+                    const length = newItem['長度'] || '';
+                    newItem['名稱'] = `${type} ${thick} ${curl} ${length}`.trim();
                 }
 
                 // 送出至 Firebase
@@ -1600,13 +1600,13 @@
                 return;
             }
 
-            // 同樣處理睫毛的名稱重組
+            // 同樣處理睫毛的名稱重組 (使用 updateItem 變數)
             if (currentEditCategory === 'lash') {
                 const type = updateItem['種類'] || '';
                 const thick = updateItem['粗細度'] || '';
-                const length = updateItem['長度'] || '';
                 const curl = updateItem['捲度'] || '';
-                updateItem['名稱'] = `${type} ${thick} ${length} ${curl}`.trim();
+                const length = updateItem['長度'] || '';
+                updateItem['名稱'] = `${type} ${thick} ${curl} ${length}`.trim();
             }
 
             db.collection("inventory").doc(currentEditId).update(updateItem)
@@ -2450,10 +2450,3 @@
     </script>
 </body>
 </html>
-
-這是原代碼
-
-在庫存明細這邊除了編輯與刪除按鈕 在幫我增加一個複製的按鈕 一樣是線條複製的圖案
-這樣我在建檔時可以快速複製現有的庫存項目，然後再修改名稱或數量來建立新項目。
-
-庫存明細的排序就依照我建檔的順序來
