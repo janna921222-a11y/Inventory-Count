@@ -2088,7 +2088,7 @@
                     icsMSG += `EXDATE;VALUE=DATE:${exdates.join(',')}\n`;
                 }
                 
-                icsMSG += "SUMMARY:繆米美學 - 每週小盤點\n";
+                icsMSG += "SUMMARY:小盤點\n";
                 icsMSG += "DESCRIPTION:請開啟庫存管理 App 進行每週小盤點作業\n";
                 icsMSG += "END:VEVENT\n";
             }
@@ -2101,7 +2101,7 @@
                 icsMSG += `DTSTART;VALUE=DATE:${todayStr}\n`;
                 let rrule = majorDay === 'last' ? 'FREQ=MONTHLY;BYMONTHDAY=-1' : `FREQ=MONTHLY;BYMONTHDAY=${majorDay}`;
                 icsMSG += `RRULE:${rrule}\n`;
-                icsMSG += "SUMMARY:繆米美學 - 每月大盤點\n";
+                icsMSG += "SUMMARY:大盤點\n";
                 icsMSG += "DESCRIPTION:請開啟庫存管理 App 進行全品項大盤點作業\n";
                 icsMSG += "END:VEVENT\n";
             }
