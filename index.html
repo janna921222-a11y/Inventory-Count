@@ -784,6 +784,7 @@
                     <li class="admin-only" onclick="switchPage('page-account-manage'); loadAccountList();"><span>帳號權限管理</span> <span>&gt;</span></li>
                     <li class="admin-only" onclick="exportToCSV()"><span>匯出目前庫存狀態 (CSV)</span> <span>&gt;</span></li>
                     <li class="admin-only" onclick="switchPage('page-history'); loadHistoryData();"><span>查看庫存變動紀錄</span> <span>&gt;</span></li>
+                    <li class="admin-only" onclick="forceSetSafeStockToOne()" style="color: #d9534f;"><span>⚠️ 強制將所有項目的庫存標準設為 1</span> <span>&gt;</span></li>
                     
                     <li onclick="logoutAccount()"><span>登出</span> <span>&gt;</span></li>
                 </ul>
@@ -1113,6 +1114,7 @@
                             ${noteHtml}
                             <div class="detail-stock">
                                 <span>目前庫存: <span class="stock-text-${id}">${currentStock}</span></span>
+                                ${data['庫存標準'] !== undefined && data['庫存標準'] !== "" ? `<span style="color: var(--gold-main); font-size: 0.9rem;">/ 庫存標準: ${data['庫存標準']}</span>` : ''}
                             </div>
                         </div>
                     `;
@@ -1302,6 +1304,7 @@
                         ${noteHtml}
                         <div class="detail-stock">
                             <span>目前庫存: <span class="stock-text-${data.id}">${data['庫存'] || 0}</span></span>
+                            ${data['庫存標準'] !== undefined && data['庫存標準'] !== "" ? `<span style="color: var(--gold-main); font-size: 0.9rem;">/ 庫存標準: ${data['庫存標準']}</span>` : ''}
                         </div>
                     </div>
                 `;
@@ -1388,7 +1391,8 @@
                     const labelElement = parentDiv.querySelector('label');
                     if (!labelElement) return;
 
-                    const labelName = labelElement.innerText.replace(' (非必填)', '').trim();
+                    let labelText = labelElement.innerText || labelElement.textContent;
+                    const labelName = labelText.split('(')[0].split('（')[0].trim();
                     newItem[labelName] = input.value;
                     
                     // 檢查必填欄位，如果沒填就將該欄位框線變紅色
@@ -1466,7 +1470,10 @@
                     inputs.forEach(input => {
                         const parentDiv = input.closest('.form-group');
                         if (!parentDiv) return;
-                        const labelName = parentDiv.querySelector('label').innerText.replace(' (非必填)', '').trim();
+                        
+                        let labelText = parentDiv.querySelector('label').innerText || parentDiv.querySelector('label').textContent;
+                        const labelName = labelText.split('(')[0].split('（')[0].trim();
+                        
                         // 排除庫存跟備註，其他有值的都帶過去
                         if (!['庫存', '庫存標準', '備註'].includes(labelName) && data[labelName] !== undefined) {
                             input.value = data[labelName];
@@ -1560,7 +1567,8 @@
                 const labelElement = parentDiv.querySelector('label');
                 if (!labelElement) return;
 
-                const labelName = labelElement.innerText.replace(' (非必填)', '').trim();
+                let labelText = labelElement.innerText || labelElement.textContent;
+                const labelName = labelText.split('(')[0].split('（')[0].trim();
                 updateItem[labelName] = input.value;
                 
                 if(input.required && !input.value) {
@@ -1731,6 +1739,36 @@
             }).catch(err => {
                 listContainer.innerHTML = `<div style="color:#d9534f; text-align:center;">載入失敗: ${err.message}</div>`;
             });
+        };
+
+        // ==========================================
+        // 強制將所有庫存項目的「庫存標準」設為 1
+        // ==========================================
+        window.forceSetSafeStockToOne = async function() {
+            if(!confirm("確定要將【所有庫存項目】的「庫存標準」強制設定為 1 嗎？\n注意：這會覆蓋掉目前所有的標準設定喔！")) return;
+
+            try {
+                const snapshot = await db.collection("inventory").get();
+                let fixCount = 0;
+                const batch = db.batch();
+
+                snapshot.forEach(doc => {
+                    const docRef = db.collection("inventory").doc(doc.id);
+                    // 無視裡面原本有沒有資料，直接強制塞入 庫存標準: 1
+                    batch.update(docRef, { '庫存標準': 1 });
+                    fixCount++;
+                });
+
+                if (fixCount > 0) {
+                    await batch.commit();
+                    alert(`✅ 強制設定成功！已將 ${fixCount} 筆商品資料的「庫存標準」全數改為 1。`);
+                    window.location.reload(); // 重新整理網頁以套用最新狀態
+                } else {
+                    alert("沒有找到任何商品資料可以修改。");
+                }
+            } catch (error) {
+                alert("錯誤：" + error.message);
+            }
         };
 
         // ==========================================
@@ -2446,3 +2484,5 @@
     </script>
 </body>
 </html>
+
+為甚麼庫存警告跑不出來 而且我原先設定的庫存標準也不見了
