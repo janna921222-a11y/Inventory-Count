@@ -2045,16 +2045,49 @@
             
             // 為了符合 ICS 行事曆標準並允許更新，必須加上 DTSTAMP (目前時間的 UTC 格式)
             const dtstamp = now.toISOString().replace(/[-:]/g, '').split('.')[0] + "Z";
+
+            // 預先計算未來 3 年 (36個月) 內小盤與大盤撞期的日期，將其設為例外日 (EXDATE)
+            let exdates = [];
+            if (minorDay !== "" && majorDay !== "") {
+                let minorDOW = parseInt(minorDay);
+                let currentYear = now.getFullYear();
+                let currentMonth = now.getMonth();
+                
+                for (let i = 0; i < 36; i++) {
+                    let targetDate;
+                    if (majorDay === 'last') {
+                        // 取得該月最後一天
+                        targetDate = new Date(currentYear, currentMonth + i + 1, 0);
+                    } else {
+                        targetDate = new Date(currentYear, currentMonth + i, parseInt(majorDay));
+                        // 避免像 2月30日 自動跳到 3月 的無效日期狀況
+                        if (targetDate.getMonth() !== (currentMonth + i) % 12) continue;
+                    }
+                    
+                    // 如果這天的大盤剛好等於小盤的星期幾，就加入排除名單
+                    if (targetDate.getDay() === minorDOW) {
+                        let y = targetDate.getFullYear();
+                        let m = String(targetDate.getMonth() + 1).padStart(2, '0');
+                        let d = String(targetDate.getDate()).padStart(2, '0');
+                        exdates.push(`${y}${m}${d}`);
+                    }
+                }
+            }
             
             // 處理小盤點 (每週)
             if (minorDay !== "") {
                 icsMSG += "BEGIN:VEVENT\n";
-                // 加上固定的 UID，手機行事曆讀到相同 UID 就會自動覆蓋舊紀錄
                 icsMSG += `UID:minor-stocktake@meawmebeauty.app\n`; 
                 icsMSG += `DTSTAMP:${dtstamp}\n`;
                 icsMSG += `DTSTART;VALUE=DATE:${todayStr}\n`;
                 const days = ["SU", "MO", "TU", "WE", "TH", "FR", "SA"];
                 icsMSG += `RRULE:FREQ=WEEKLY;BYDAY=${days[minorDay] || "MO"}\n`;
+                
+                // 如果有撞期日，加入 EXDATE 讓行事曆在這幾天自動隱藏小盤點
+                if (exdates.length > 0) {
+                    icsMSG += `EXDATE;VALUE=DATE:${exdates.join(',')}\n`;
+                }
+                
                 icsMSG += "SUMMARY:繆米美學 - 每週小盤點\n";
                 icsMSG += "DESCRIPTION:請開啟庫存管理 App 進行每週小盤點作業\n";
                 icsMSG += "END:VEVENT\n";
@@ -2063,7 +2096,6 @@
             // 處理大盤點 (每月)
             if (majorDay !== "") {
                 icsMSG += "BEGIN:VEVENT\n";
-                // 加上固定的 UID，手機行事曆讀到相同 UID 就會自動覆蓋舊紀錄
                 icsMSG += `UID:major-stocktake@meawmebeauty.app\n`; 
                 icsMSG += `DTSTAMP:${dtstamp}\n`;
                 icsMSG += `DTSTART;VALUE=DATE:${todayStr}\n`;
@@ -2075,7 +2107,6 @@
             }
             
             icsMSG += "END:VCALENDAR";
-            // 複用稍早建立的 downloadBlob 函數來觸發下載
             downloadBlob(icsMSG, "MeawMeBeauty_Schedule.ics", "text/calendar;charset=utf-8;");
         }
 
