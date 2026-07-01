@@ -1024,7 +1024,7 @@
         });
 
         // 2. 即時讀取雲端資料庫並渲染所有列表與庫存數字
-        db.collection("inventory").onSnapshot((snapshot) => {
+        db.collection("inventory").orderBy("createdAt", "asc").onSnapshot((snapshot) => {
             // 抓取畫面上所有的列表容器
             const listGel = document.getElementById('list-detail-gel');
             const listLash = document.getElementById('list-detail-lash');
@@ -1103,6 +1103,10 @@
                         <div class="detail-header">
                             <div class="detail-title">${data['名稱']}</div>
                             <div style="display: flex; gap: 8px; margin-left: 10px;">
+                                <!-- 複製圖示 -->
+                                <button class="edit-btn" onclick="copyItem('${id}')" title="複製">
+                                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                                </button>
                                 <!-- 鉛筆圖示 (編輯) -->
                                 <button class="edit-btn" onclick="openEditPage('${id}')" title="編輯">
                                     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
@@ -1318,6 +1322,9 @@
                         <div class="detail-header">
                             <div class="detail-title">${data['名稱']}</div>
                             <div class="admin-only" style="display: flex; gap: 8px; margin-left: 10px;">
+                                <button class="edit-btn" onclick="copyItem('${data.id}')" title="複製">
+                                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                                </button>
                                 <button class="edit-btn" onclick="openEditPage('${data.id}')" title="編輯">
                                     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
                                 </button>
@@ -1469,6 +1476,31 @@
         // 5. 完善編輯功能：讀取資料並畫出編輯表單
         let currentEditId = null;
         let currentEditCategory = null;
+
+        // 這是新加的複製功能
+        window.copyItem = function(docId) {
+            db.collection("inventory").doc(docId).get().then((doc) => {
+                if (doc.exists) {
+                    const data = doc.data();
+                    const categorySelect = document.getElementById('add-category-select');
+                    categorySelect.value = data.category;
+                    categorySelect.dispatchEvent(new Event('change'));
+                    
+                    const inputs = document.getElementById('dynamic-form-fields').querySelectorAll('.form-input');
+                    inputs.forEach(input => {
+                        const parentDiv = input.closest('.form-group');
+                        if (!parentDiv) return;
+                        const labelName = parentDiv.querySelector('label').innerText.replace(' (非必填)', '').trim();
+                        // 排除庫存跟備註，其他有值的都帶過去
+                        if (!['庫存', '安全庫存', '備註'].includes(labelName) && data[labelName] !== undefined) {
+                            input.value = data[labelName];
+                        }
+                    });
+                    switchPage('page-add');
+                    document.getElementById('page-add').scrollTo({ top: 0, behavior: 'smooth' });
+                }
+            }).catch(error => alert("複製項目失敗: " + error));
+        };
 
         window.openEditPage = function(docId) {
             db.collection("inventory").doc(docId).get().then((doc) => {
@@ -2418,3 +2450,10 @@
     </script>
 </body>
 </html>
+
+這是原代碼
+
+在庫存明細這邊除了編輯與刪除按鈕 在幫我增加一個複製的按鈕 一樣是線條複製的圖案
+這樣我在建檔時可以快速複製現有的庫存項目，然後再修改名稱或數量來建立新項目。
+
+庫存明細的排序就依照我建檔的順序來
