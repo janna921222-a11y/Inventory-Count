@@ -1,0 +1,2368 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>庫存盤點 App</title>
+    <style>
+        /* 您提供的色彩變數 */
+        :root {
+            --forest-bg: #f5f1e8;
+            --white-main:#1c3328;
+            --white-sec: #4a5a54;
+            --gold-main: #8a6d3b;
+            --border-base: #c9b896;
+            --card-bg: rgba(26, 58, 46, 0.05);
+            --nav-bg: #f5f1e8;
+            --nav-text-unselect: rgba(26, 58, 46, 0.4);
+            --nav-text-active:#1c3328;
+            --nav-shadow: 0 -4px 15px rgba(26, 58, 46, 0.1);
+        }
+
+        /* 基礎重置與字體設定 */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: #ffffff; /* 瀏覽器外圍底色 */
+            color: var(--white-main);
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* 全平台自適應容器 (手機、平板、電腦) */
+        .app-container {
+            background-color: var(--forest-bg);
+            width: 100%;
+            max-width: 1200px; /* 限制最大寬度，避免在超大電腦螢幕過度拉伸 */
+            margin: 0 auto;
+            min-height: 100vh;
+            position: relative;
+            box-shadow: 0 0 20px rgba(0,0,0,0.05);
+            padding-bottom: 80px; /* 預留底部導覽列空間 */
+        }
+
+        /* 響應式設計 (平板與電腦版面調整) */
+        @media (min-width: 768px) {
+            .category-grid {
+                grid-template-columns: repeat(4, 1fr); /* 螢幕變大時，首頁分類改為 4 欄 */
+            }
+            .item-list {
+                display: grid;
+                grid-template-columns: repeat(2, 1fr); /* 盤點列表在電腦/平板改為 2 欄並排 */
+                gap: 16px;
+            }
+            .main-content {
+                padding: 0 40px; /* 大螢幕增加左右空間 */
+            }
+        }
+
+        /* 頂部 Header 區塊 */
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 20px;
+            background-color: var(--forest-bg);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .logo {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: var(--gold-main);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        /* 設定 Logo 圖片，保持比例並適應 Header 高度 */
+        .logo-img {
+            height: 30px;
+            width: auto;
+            object-fit: contain;
+        }
+
+        .header-action {
+            font-size: 1.2rem;
+            color: var(--white-main);
+            cursor: pointer;
+        }
+
+        /* 主要內容區 */
+        .main-content {
+            padding: 0 20px;
+        }
+
+        /* 頁面切換控制 */
+        .page {
+            display: none;
+        }
+
+        .page.active {
+            display: block;
+        }
+
+        .page-title {
+            font-size: 1.4rem;
+            margin-bottom: 20px;
+            color: var(--white-main);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .back-btn {
+            background: none;
+            border: none;
+            color: var(--white-main);
+            font-size: 1.5rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            padding-right: 8px;
+        }
+
+        .group-title {
+            font-size: 1.1rem;
+            color: var(--gold-main);
+            margin: 24px 0 12px 0;
+            border-bottom: 1px solid var(--border-base);
+            padding-bottom: 6px;
+        }
+
+        /* 表單與設定清單樣式 (新增/設定頁面用) */
+        .form-group {
+            margin-bottom: 16px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: var(--white-sec);
+            font-size: 0.9rem;
+        }
+        
+        .form-input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid var(--border-base);
+            border-radius: 8px;
+            background-color: transparent;
+            color: var(--white-main);
+            font-size: 1rem;
+        }
+        
+        .btn-primary {
+            width: 100%;
+            padding: 14px;
+            background-color: var(--gold-main);
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        
+        .settings-list {
+            list-style: none;
+        }
+        
+        .settings-list li {
+            padding: 16px 0;
+            border-bottom: 1px solid var(--border-base);
+            font-size: 1.1rem;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        /* 列表共用樣式 */
+        .item-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        /* 盤點單純計數卡片 */
+        .stocktaking-card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-base);
+            border-radius: 12px;
+            padding: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .stocktaking-card h4 {
+            color: var(--white-main);
+            font-size: 1.1rem;
+            margin-bottom: 4px;
+        }
+        
+        .item-action {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .qty-btn {
+            background-color: var(--gold-main);
+            color: #ffffff;
+            border: none;
+            border-radius: 8px;
+            width: 32px;
+            height: 32px;
+            font-size: 1.2rem;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+        }
+
+        .qty-num {
+            color: var(--white-main);
+            font-weight: bold;
+            font-size: 1.1rem;
+            min-width: 24px;
+            text-align: center;
+        }
+
+        /* 庫存明細卡片 (詳細資訊) */
+        .detail-card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-base);
+            border-radius: 12px;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        .detail-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+        
+        .detail-title {
+            color: var(--white-main);
+            font-size: 1.1rem;
+            font-weight: bold;
+            line-height: 1.4;
+        }
+        
+        .edit-btn {
+            background: none;
+            border: 1px solid var(--gold-main);
+            color: var(--gold-main);
+            border-radius: 6px;
+            padding: 6px 8px; /* 調整內距以適應圖示 */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            margin-left: 0;
+            transition: opacity 0.2s;
+        }
+        .edit-btn:active {
+            opacity: 0.5;
+        }
+        
+        .detail-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+        
+        .tag {
+            background-color: rgba(138, 109, 59, 0.1);
+            color: var(--gold-main);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+        }
+
+        .tag-alert {
+            background-color: rgba(217, 83, 79, 0.1);
+            color: #d9534f;
+        }
+
+        .detail-note {
+            color: var(--white-sec);
+            font-size: 0.9rem;
+            background-color: rgba(255,255,255,0.5);
+            padding: 8px;
+            border-radius: 6px;
+        }
+        
+        .detail-stock {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-top: 1px dashed var(--border-base);
+            padding-top: 10px;
+            font-weight: bold;
+            color: var(--white-main);
+        }
+
+        /* 庫存預警卡片 (使用 rgba 卡片底色) */
+        .warning-card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-base);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .warning-info h3 {
+            font-size: 1.1rem;
+            color: var(--white-main);
+            margin-bottom: 4px;
+        }
+
+        .warning-info p {
+            font-size: 0.9rem;
+            color: var(--white-sec);
+        }
+
+        .warning-btn {
+            background-color: var(--gold-main);
+            color: #ffffff;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        /* 分類網格 (Grid) */
+        .category-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        .category-item {
+            background-color: transparent;
+            border: 1px solid var(--border-base);
+            border-radius: 12px;
+            padding: 20px 16px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .category-item:active {
+            background-color: var(--card-bg); /* 點擊時的視覺回饋 */
+        }
+
+        /* 分類 Icon 容器與圖片自適應設定 */
+        .category-icon {
+            height: 40px; /* 固定高度確保網格整齊 */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .category-icon img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain; /* 確保圖片不變形，完整顯示 */
+        }
+
+        .category-name {
+            font-size: 1rem;
+            font-weight: bold;
+            color: var(--white-main);
+            margin-bottom: 4px;
+        }
+
+        .category-count {
+            font-size: 0.8rem;
+            color: var(--white-sec);
+        }
+
+        /* 底部導覽列 - 改為 fixed 永遠固定在視窗底部 */
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%); /* 確保在寬螢幕時也能置中對齊容器 */
+            width: 100%;
+            max-width: 1200px; /* 必須與 .app-container 寬度一致 */
+            background-color: var(--nav-bg);
+            box-shadow: var(--nav-shadow);
+            display: flex;
+            justify-content: space-around;
+            padding: 12px 0 calc(12px + env(safe-area-inset-bottom)); 
+            border-top: 1px solid rgba(201, 184, 150, 0.3);
+            z-index: 1000;
+        }
+
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            color: var(--nav-text-unselect); /* 未選中顏色 */
+            text-decoration: none;
+            font-size: 0.75rem;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .nav-item.active {
+            color: var(--nav-text-active); /* 選中顏色 */
+        }
+
+        .nav-item svg {
+            width: 24px;
+            height: 24px;
+            fill: currentColor; /* 讓 SVG 顏色跟隨文字顏色變化 */
+        }
+
+        /* 權限控制：當 body 擁有 role-user 類別時，隱藏管理者專屬元素 */
+        body.role-user .admin-only {
+            display: none !important;
+        }
+        body.role-user .edit-btn {
+            display: none !important; /* 隱藏明細卡片中的編輯/刪除按鈕 */
+        }
+        body.role-user .nav-item[data-target="page-add"] {
+            display: none !important; /* 隱藏底部導覽列的「新增」 */
+        }
+
+        /* 盤點完成的卡片自動往下排並半透明 */
+        .stocktaking-card.counted-item {
+            order: 1;
+            opacity: 0.5;
+            background-color: rgba(92, 184, 92, 0.05);
+            border-color: rgba(92, 184, 92, 0.3);
+        }
+
+        /* 盤點頁面設為 Flex 容器 */
+        #page-stocktaking.active {
+            display: flex;
+            flex-direction: column;
+        }
+        #page-stocktaking > h1 { order: 1; }
+        #page-stocktaking > div:nth-of-type(1) { order: 2; } /* 狀態卡片 */
+        #stocktaking-banner { order: 3; }
+        
+        /* 將完成按鈕移至最上方 (緊跟在橫幅下方) */
+        #finish-stocktake-container { 
+            order: 4; 
+            margin-top: 10px; 
+            margin-bottom: 24px; 
+        }
+        
+        /* 預設分類順序 */
+        #title-stock-gel { order: 10; }
+        #stocktaking-gel { order: 11; }
+        #title-stock-nail-consumable { order: 12; }
+        #stocktaking-nail-consumable { order: 13; }
+        #title-stock-lash { order: 14; }
+        #stocktaking-lash { order: 15; }
+        #title-stock-lash-consumable { order: 16; }
+        #stocktaking-lash-consumable { order: 17; }
+        #title-stock-equipment { order: 18; }
+        #stocktaking-equipment { order: 19; }
+        #title-stock-general { order: 20; }
+        #stocktaking-general { order: 21; }
+
+        /* 完成的分類與列表賦予相同的 order，讓它們黏在一起降至底部 */
+        .completed-category { order: 80 !important; }
+        .completed-category-title { opacity: 0.5; transition: all 0.3s; }
+    </style>
+</head>
+<body>
+
+    <div class="app-container">
+        <!-- 頂部 Header -->
+        <header class="header">
+            <div class="logo">
+                <!-- 載入同資料夾的 logo 圖檔 (請確保檔名一致) -->
+                <img src="logo.png" alt="MEAW ME BEAUTY Logo" class="logo-img">
+                <div style="display: flex; flex-direction: column;">
+                    <div style="font-size: 1.3rem; text-align-last: justify;">繆米美學</div>
+                    <div style="font-size: 0.7rem; white-space: nowrap;">｜MEAW ME BEAUTY｜</div>
+                </div>
+            </div>
+            <!-- 搜尋圖示 -->
+            <div class="header-action" onclick="switchPage('page-search'); executeSearch();">
+                <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            </div>
+        </header>
+
+        <!-- 主要內容 -->
+        <main class="main-content">
+            <!-- 首頁 (狀態：顯示) -->
+            <div id="page-home" class="page active">
+                <h1 class="page-title">庫存總覽</h1>
+
+            <!-- 庫存預警動態生成區塊 (由 JS 控制) -->
+            <div id="dynamic-warning-area"></div>
+
+            <!-- 分類選單 -->
+            <div class="category-grid">
+                <div class="category-item" onclick="switchPage('page-sub-nail')">
+                    <div class="category-name">美甲</div>
+                    <div class="category-count" id="count-main-nail">0 項庫存</div>
+                </div>
+                <div class="category-item" onclick="switchPage('page-sub-lash')">
+                    <div class="category-name">美睫</div>
+                    <div class="category-count" id="count-main-lash">0 項庫存</div>
+                </div>
+                <div class="category-item" onclick="switchPage('page-detail-equipment')">
+                    <div class="category-name">工具設備</div>
+                    <div class="category-count" id="count-main-equipment">0 項庫存</div>
+                </div>
+                <div class="category-item" onclick="switchPage('page-detail-general')">
+                    <div class="category-name">一般消耗品</div>
+                    <div class="category-count" id="count-main-general">0 項庫存</div>
+                </div>
+            </div>
+            </div> <!-- 結束首頁容器 -->
+
+            <!-- 美甲子分類頁面 (狀態：隱藏) -->
+            <div id="page-sub-nail" class="page">
+                <h1 class="page-title">
+                    <button class="back-btn" onclick="switchPage('page-home')">←</button>
+                    美甲分類
+                </h1>
+                <div class="category-grid">
+                    <div class="category-item" onclick="switchPage('page-detail-gel')">
+                        <div class="category-name">凝膠</div>
+                        <div class="category-count" id="count-gel">0 項庫存</div>
+                    </div>
+                    <div class="category-item" onclick="switchPage('page-detail-nail-consumable')">
+                        <div class="category-name">耗材</div>
+                        <div class="category-count" id="count-nail-consumable">0 項庫存</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 美睫子分類頁面 (狀態：隱藏) -->
+            <div id="page-sub-lash" class="page">
+                <h1 class="page-title">
+                    <button class="back-btn" onclick="switchPage('page-home')">←</button>
+                    美睫分類
+                </h1>
+                <div class="category-grid">
+                    <div class="category-item" onclick="switchPage('page-detail-lash')">
+                        <div class="category-name">睫毛</div>
+                        <div class="category-count" id="count-lash">0 項庫存</div>
+                    </div>
+                    <div class="category-item" onclick="switchPage('page-detail-lash-consumable')">
+                        <div class="category-name">耗材</div>
+                        <div class="category-count" id="count-lash-consumable">0 項庫存</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 庫存明細：美甲-凝膠 -->
+            <div id="page-detail-gel" class="page">
+                <h1 class="page-title">
+                    <button class="back-btn" onclick="switchPage('page-sub-nail')">←</button>庫存明細 - 凝膠
+                </h1>
+                <div class="item-list" id="list-detail-gel">
+                    <!-- 從雲端讀取的凝膠資料將顯示在此 -->
+                </div>
+            </div>
+
+            <!-- 庫存明細：美甲-耗材 -->
+            <div id="page-detail-nail-consumable" class="page">
+                <h1 class="page-title">
+                    <button class="back-btn" onclick="switchPage('page-sub-nail')">←</button>庫存明細 - 美甲耗材
+                </h1>
+                <div class="item-list" id="list-detail-nail-consumable">
+                    <!-- 從雲端讀取的耗材資料將顯示在此 -->
+                </div>
+            </div>
+
+            <!-- 庫存明細：美睫-毛 -->
+            <div id="page-detail-lash" class="page">
+                <h1 class="page-title">
+                    <button class="back-btn" onclick="switchPage('page-sub-lash')">←</button>庫存明細 - 睫毛
+                </h1>
+                <div class="item-list" id="list-detail-lash">
+                    <!-- 從雲端讀取的睫毛資料將顯示在此 -->
+                </div>
+            </div>
+
+            <!-- 庫存明細：美睫-耗材 -->
+            <div id="page-detail-lash-consumable" class="page">
+                <h1 class="page-title">
+                    <button class="back-btn" onclick="switchPage('page-sub-lash')">←</button>庫存明細 - 美睫耗材
+                </h1>
+                <div class="item-list" id="list-detail-lash-consumable">
+                    <!-- 從雲端讀取的美睫耗材資料將顯示在此 -->
+                </div>
+            </div>
+
+            <!-- 庫存明細：工具設備 -->
+            <div id="page-detail-equipment" class="page">
+                <h1 class="page-title">
+                    <button class="back-btn" onclick="switchPage('page-home')">←</button>庫存明細 - 工具設備
+                </h1>
+                <div class="item-list" id="list-detail-equipment">
+                    <!-- 從雲端讀取的工具設備資料將顯示在此 -->
+                </div>
+            </div>
+
+            <!-- 庫存明細：一般消耗品 -->
+            <div id="page-detail-general" class="page">
+                <h1 class="page-title">
+                    <button class="back-btn" onclick="switchPage('page-home')">←</button>庫存明細 - 一般消耗品
+                </h1>
+                <div class="item-list" id="list-detail-general">
+                    <!-- 從雲端讀取的一般消耗品資料將顯示在此 -->
+                </div>
+            </div>
+
+            <!-- 單純數量盤點 (由底部導覽列進入) -->
+            <div id="page-stocktaking" class="page">
+                <h1 class="page-title" style="justify-content: space-between;">
+                    <span>數量盤點</span>
+                    <button id="cancel-stocktake-btn" class="back-btn" style="display: none; font-size: 1.2rem; color: #d9534f;" onclick="cancelStocktake()" title="取消盤點">✖</button>
+                </h1>
+
+                <!-- 顯示盤點狀態與時間的常駐卡片 -->
+                <div id="stocktake-status-card" style="background-color: var(--card-bg); padding: 12px 16px; border-radius: 12px; border: 1px solid var(--border-base); margin-bottom: 20px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <div id="today-date-display" style="font-size: 0.85rem; color: var(--white-sec);"></div>
+                        <div style="font-weight: bold; font-size: 0.95rem; display: flex; align-items: center; gap: 6px;">
+                            <span id="stocktake-status-dot" style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background-color: var(--white-sec);"></span>
+                            <span id="stocktake-status-text">讀取狀態中...</span>
+                        </div>
+                    </div>
+                    <div style="font-size: 0.9rem; color: var(--white-main); line-height: 1.5;">
+                        <div style="display: flex; justify-content: space-between;">
+                            <span>上次盤點時間：</span>
+                            <span id="last-stocktake-time" style="font-weight:bold;">讀取中...</span>
+                        </div>
+                        <div id="last-addition-container" style="display: none; color: var(--gold-main); margin-top: 4px; border-top: 1px dashed var(--border-base); padding-top: 4px; font-weight: bold;">
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-top: -2px;"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                            有新項目加入尚未盤點！<span id="new-item-recommendation" style="color: #d9534f; margin-left: 4px;"></span>
+                        </div>
+                    </div>
+                </div>
+                
+                <h2 class="group-title" id="title-stock-gel">凝膠</h2>
+                <div class="item-list" id="stocktaking-gel"></div>
+
+                <h2 class="group-title" id="title-stock-nail-consumable">耗材-甲</h2>
+                <div class="item-list" id="stocktaking-nail-consumable"></div>
+
+                <h2 class="group-title" id="title-stock-lash">睫毛</h2>
+                <div class="item-list" id="stocktaking-lash"></div>
+                
+                <h2 class="group-title" id="title-stock-lash-consumable">耗材-睫</h2>
+                <div class="item-list" id="stocktaking-lash-consumable"></div>
+
+                <h2 class="group-title" id="title-stock-equipment">工具設備</h2>
+                <div class="item-list" id="stocktaking-equipment"></div>
+
+                <h2 class="group-title" id="title-stock-general">一般消耗品</h2>
+                <div class="item-list" id="stocktaking-general"></div>
+                
+                <!-- 完成盤點按鈕區塊 -->
+                <div id="finish-stocktake-container" style="display: none; margin-top: 32px; margin-bottom: 20px; text-align: center;">
+                    <button class="btn-primary" style="background-color: var(--white-main); color: var(--forest-bg); padding: 16px; font-size: 1.2rem; border-radius: 12px; box-shadow: 0 4px 15px rgba(26,58,46,0.2);" onclick="submitStocktakeSummary()">完成盤點並同步</button>
+                </div>
+            </div> <!-- 結束數量盤點容器 -->
+
+            <!-- 搜尋頁面 (狀態：隱藏) -->
+            <div id="page-search" class="page">
+                <h1 class="page-title">
+                    <button class="back-btn" onclick="switchPage('page-home')">←</button>搜尋庫存
+                </h1>
+                
+                <!-- 搜尋與篩選列 -->
+                <div style="background-color: var(--card-bg); padding: 16px; border-radius: 12px; border: 1px solid var(--border-base); margin-bottom: 20px;">
+                    <div class="form-group" style="margin-bottom: 12px;">
+                        <label>輸入關鍵字尋找</label>
+                        <input type="text" id="search-input" class="form-input" placeholder="名稱、品牌、規格或購買渠道..." oninput="executeSearch()">
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label>依照分類篩選 (選填)</label>
+                        <select id="search-category" class="form-input" onchange="executeSearch()">
+                            <option value="">全部分類 (不限)</option>
+                            <option value="gel">美甲 - 凝膠</option>
+                            <option value="nail-consumable">美甲 - 耗材</option>
+                            <option value="lash">美睫 - 睫毛</option>
+                            <option value="lash-consumable">美睫 - 耗材</option>
+                            <option value="equipment">工具設備</option>
+                            <option value="general-consumable">一般消耗品</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="group-title">搜尋結果 (<span id="search-result-count">0</span>)</div>
+                <div class="item-list" id="search-results-list">
+                    <!-- 搜尋結果將顯示在此 -->
+                </div>
+            </div>
+            
+            <!-- 歷史紀錄頁面 (狀態：隱藏) -->
+            <div id="page-history" class="page">
+                <h1 class="page-title">
+                    <button class="back-btn" onclick="switchPage('page-settings')">←</button>庫存變動紀錄
+                </h1>
+                
+                <div style="text-align: right; margin-bottom: 16px;">
+                    <button class="edit-btn" style="display: inline-flex; width: auto; font-size: 0.9rem;" onclick="exportHistoryCSV()">下載完整 CSV 報表</button>
+                </div>
+                
+                <div class="item-list" id="history-grouped-list">
+                    <!-- 動態生成的群組(大項/細項)列表將顯示在此 -->
+                </div>
+            </div>
+
+            <!-- 新增頁面 (狀態：隱藏) -->
+            <div id="page-add" class="page">
+                <h1 class="page-title">新增庫存項目</h1>
+                <div class="form-group">
+                    <label>所屬分類</label>
+                    <select class="form-input" id="add-category-select">
+                        <option value="">請選擇分類...</option>
+                        <option value="gel">美甲 - 凝膠</option>
+                        <option value="nail-consumable">美甲 - 耗材</option>
+                        <option value="lash">美睫 - 睫毛</option>
+                        <option value="lash-consumable">美睫 - 耗材</option>
+                        <option value="equipment">工具設備</option>
+                        <option value="general-consumable">一般消耗品</option>
+                    </select>
+                </div>
+                
+                <!-- 動態表單容器 (由 JavaScript 生成欄位) -->
+                <div id="dynamic-form-fields"></div>
+
+                <button type="button" class="btn-primary" id="btn-submit-add" style="display:none;">確認新增</button>
+            </div>
+
+            <!-- 編輯頁面 (狀態：隱藏) -->
+            <div id="page-edit" class="page">
+                <h1 class="page-title">
+                    <button class="back-btn" onclick="switchPage('page-home')">←</button>編輯庫存項目
+                </h1>
+                <div id="edit-dynamic-form-fields"></div>
+                <button type="button" class="btn-primary" id="btn-submit-edit" style="display:none;">儲存修改</button>
+            </div>
+
+            <!-- 設定頁面 (狀態：隱藏) -->
+            <div id="page-settings" class="page">
+                <h1 class="page-title">系統設定</h1>
+                <ul class="settings-list">
+                    <li onclick="requestNotificationPermission()"><span>啟用手機推播通知 (首次)</span> <span>&gt;</span></li>
+                    <li onclick="manageAccount()"><span>帳號登入 / 切換</span> <span id="current-user-status" style="color: var(--white-sec); font-size: 0.9rem;">未登入 &gt;</span></li>
+                    
+                    <!-- 以下三個僅管理員可見 -->
+                    <li class="admin-only" onclick="switchPage('page-schedule-settings')"><span>盤點排程設定</span> <span>&gt;</span></li>
+                    <li class="admin-only" onclick="switchPage('page-account-manage'); loadAccountList();"><span>帳號權限管理</span> <span>&gt;</span></li>
+                    <li class="admin-only" onclick="exportToCSV()"><span>匯出目前庫存狀態 (CSV)</span> <span>&gt;</span></li>
+                    <li class="admin-only" onclick="switchPage('page-history'); loadHistoryData();"><span>查看庫存變動紀錄</span> <span>&gt;</span></li>
+                    
+                    <li onclick="logoutAccount()"><span>登出</span> <span>&gt;</span></li>
+                </ul>
+            </div>
+
+            <!-- 子頁面：盤點排程設定 (僅管理員可進入) -->
+            <div id="page-schedule-settings" class="page">
+                <h1 class="page-title">
+                    <button class="back-btn" onclick="switchPage('page-settings')">←</button>盤點排程設定
+                </h1>
+                
+                <h2 class="group-title">小盤點設定 (每週)</h2>
+                <div class="form-group">
+                    <label>選擇盤點日</label>
+                    <select id="setting-minor-day" class="form-input">
+                        <option value="">不啟用</option>
+                        <option value="1">星期一</option>
+                        <option value="2">星期二</option>
+                        <option value="3">星期三</option>
+                        <option value="4">星期四</option>
+                        <option value="5">星期五</option>
+                        <option value="6">星期六</option>
+                        <option value="0">星期日</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>小盤點項目</label>
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; color:var(--white-main); font-size:0.95rem;">
+                        <label><input type="checkbox" class="setting-minor-cat" value="gel"> 凝膠</label>
+                        <label><input type="checkbox" class="setting-minor-cat" value="nail-consumable"> 耗材-甲</label>
+                        <label><input type="checkbox" class="setting-minor-cat" value="lash"> 睫毛</label>
+                        <label><input type="checkbox" class="setting-minor-cat" value="lash-consumable"> 耗材-睫</label>
+                        <label><input type="checkbox" class="setting-minor-cat" value="equipment"> 工具設備</label>
+                        <label><input type="checkbox" class="setting-minor-cat" value="general-consumable"> 一般消耗品</label>
+                    </div>
+                </div>
+
+                <h2 class="group-title">大盤點設定 (每月)</h2>
+                <div class="form-group">
+                    <label>選擇盤點日</label>
+                    <select id="setting-major-day" class="form-input">
+                        <option value="">不啟用</option>
+                        <option value="1">每月 1 號</option>
+                        <option value="10">每月 10 號</option>
+                        <option value="15">每月 15 號</option>
+                        <option value="20">每月 20 號</option>
+                        <option value="25">每月 25 號</option>
+                        <option value="last">每個月最後一天 (月底)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>大盤點項目</label>
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; color:var(--white-main); font-size:0.95rem;">
+                        <label><input type="checkbox" class="setting-major-cat" value="gel"> 凝膠</label>
+                        <label><input type="checkbox" class="setting-major-cat" value="nail-consumable"> 耗材-甲</label>
+                        <label><input type="checkbox" class="setting-major-cat" value="lash"> 睫毛</label>
+                        <label><input type="checkbox" class="setting-major-cat" value="lash-consumable"> 耗材-睫</label>
+                        <label><input type="checkbox" class="setting-major-cat" value="equipment"> 工具設備</label>
+                        <label><input type="checkbox" class="setting-major-cat" value="general-consumable"> 一般消耗品</label>
+                    </div>
+                </div>
+                <button type="button" class="btn-primary" onclick="saveScheduleSettings()">儲存盤點排程設定</button>
+            </div>
+
+            <!-- 子頁面：帳號管理 (僅管理員可進入) -->
+            <div id="page-account-manage" class="page">
+                <h1 class="page-title">
+                    <button class="back-btn" onclick="switchPage('page-settings')">←</button>帳號管理
+                </h1>
+                
+                <h2 class="group-title">新增帳號</h2>
+                <div class="form-group"><label>登入信箱</label><input type="email" id="new-user-email" class="form-input"></div>
+                <div class="form-group"><label>密碼 (至少6碼)</label><input type="password" id="new-user-pwd" class="form-input"></div>
+                <div class="form-group">
+                    <label>權限層級</label>
+                    <select id="new-user-role" class="form-input">
+                        <option value="user">一般帳號 (僅能盤點與查看)</option>
+                        <option value="admin">管理員 (擁有所有權限)</option>
+                    </select>
+                </div>
+                <button type="button" class="btn-primary" onclick="createNewUser()">建立帳號</button>
+
+                <h2 class="group-title" style="margin-top:30px;">已建立帳號列表</h2>
+                <div class="item-list" id="account-list">
+                    <!-- 動態載入帳號列表 -->
+                </div>
+            </div>
+        </main>
+
+        <!-- 底部導覽列 -->
+        <nav class="bottom-nav">
+            <!-- 加入 data-target 對應頁面 ID -->
+            <div class="nav-item active" data-target="page-home">
+                <svg viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+                <span>首頁</span>
+            </div>
+            <div class="nav-item" data-target="page-stocktaking">
+                <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-9 14l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+                <span>盤點</span>
+            </div>
+            <!-- 新增頁面與設定頁面對應 data-target -->
+            <div class="nav-item" data-target="page-add">
+                <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+                <span>新增</span>
+            </div>
+            <div class="nav-item" data-target="page-settings">
+                <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.06-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.73 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.06.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .43-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.49-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
+                <span>設定</span>
+            </div>
+        </nav>
+    </div>
+
+    <!-- 引入 Firebase SDK 套件 -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+
+    <!-- 加上 JavaScript 讓按鈕與頁面切換生效 -->
+    <script>
+        // 初始化 Firebase 資料庫
+        const firebaseConfig = {
+            apiKey: "AIzaSyA1ohVpBUNrQemIbkcPccaY5-wJq9V9BNE",
+            authDomain: "meawmebeauty-da1ec.firebaseapp.com",
+            databaseURL: "https://meawmebeauty-da1ec-default-rtdb.firebaseio.com",
+            projectId: "meawmebeauty-da1ec",
+            storageBucket: "meawmebeauty-da1ec.firebasestorage.app",
+            messagingSenderId: "985273260747",
+            appId: "1:985273260747:web:26fc1070e637f2111cd94e"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+        const auth = firebase.auth();
+        let currentUser = null;
+        let userRole = 'user'; // 預設為一般使用者
+        window.countedSet = new Set(); // 儲存本次使用中已確認盤點的項目ID
+
+        // 監聽登入狀態與權限
+        auth.onAuthStateChanged(user => {
+            currentUser = user;
+            const statusEl = document.getElementById('current-user-status');
+            
+            if (user) {
+                // 登入後去 app_users 集合比對是否有這個帳號與權限
+                db.collection('app_users').doc(user.email.toLowerCase()).get().then(doc => {
+                    if (!doc.exists) {
+                        // 防呆機制：若資料庫內沒任何帳號，自動把第一位登入者變成最高管理員，以免系統卡死
+                        db.collection('app_users').get().then(snap => {
+                            if (snap.empty) {
+                                db.collection('app_users').doc(user.email.toLowerCase()).set({ email: user.email.toLowerCase(), role: 'admin' });
+                                userRole = 'admin';
+                                updateRoleUI(user.email);
+                            } else {
+                                alert("此帳號未經系統管理員授權，將自動登出。");
+                                auth.signOut();
+                            }
+                        });
+                    } else {
+                        userRole = doc.data().role || 'user';
+                        updateRoleUI(user.email);
+                    }
+                });
+            } else {
+                userRole = 'user';
+                updateRoleUI(null);
+            }
+        });
+
+        function updateRoleUI(email) {
+            const statusEl = document.getElementById('current-user-status');
+            if (email) {
+                if(statusEl) statusEl.innerText = `${email} (${userRole === 'admin' ? '管理員' : '一般'}) >`;
+                document.body.classList.remove(userRole === 'admin' ? 'role-user' : 'role-admin');
+                document.body.classList.add(userRole === 'admin' ? 'role-admin' : 'role-user');
+                
+                // 如果是一般帳號停留在被禁止的頁面，立刻踢回首頁
+                if (userRole !== 'admin') {
+                    const activePage = document.querySelector('.page.active')?.id;
+                    if (['page-add', 'page-account-manage', 'page-schedule-settings'].includes(activePage)) {
+                        switchPage('page-home');
+                        alert("權限不足，已返回首頁");
+                    }
+                }
+            } else {
+                if(statusEl) statusEl.innerText = '未登入 >';
+                document.body.classList.remove('role-admin');
+                document.body.classList.add('role-user'); // 未登入預設隱藏敏感按鈕
+            }
+        }
+
+        window.manageAccount = function() {
+            if (currentUser) {
+                alert(`目前登入帳號：${currentUser.email}\n權限等級：${userRole === 'admin' ? '管理員' : '一般帳號'}`);
+            } else {
+                const email = prompt("請輸入登入信箱：");
+                const pwd = prompt("請輸入密碼：");
+                if(email && pwd) {
+                    auth.signInWithEmailAndPassword(email, pwd)
+                        .then(() => alert("登入成功！"))
+                        .catch(err => alert("登入失敗，請確認帳密或聯絡管理員。(" + err.message + ")"));
+                }
+            }
+        };
+
+        window.logoutAccount = function() {
+            auth.signOut().then(() => alert("您已安全登出系統。"));
+        };
+
+        // 全域切換頁面函數 (提供給 onclick 等事件使用)
+        function switchPage(pageId) {
+            document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
+            const targetPage = document.getElementById(pageId);
+            if(targetPage) {
+                targetPage.classList.add('active');
+            }
+            
+            // 嘗試同步底部導覽列的狀態 (如果是子頁面，導覽列保持原本選中的燈號)
+            const activeNav = document.querySelector(`.nav-item[data-target="${pageId}"]`);
+            if(activeNav) {
+                document.querySelectorAll('.nav-item').forEach(nav => nav.classList.remove('active'));
+                activeNav.classList.add('active');
+            }
+        }
+
+        // 1. 處理底部導覽列與頁面切換
+        const navItems = document.querySelectorAll('.nav-item[data-target]');
+        
+        navItems.forEach(item => {
+            item.addEventListener('click', () => {
+                const targetId = item.getAttribute('data-target');
+                if(targetId) {
+                    switchPage(targetId);
+                    // 點擊進入盤點頁面時，強制重新抓取一次最新時間狀態
+                    if (targetId === 'page-stocktaking' && typeof window.checkLatestTimes === 'function') {
+                        window.checkLatestTimes();
+                    }
+                }
+            });
+        });
+
+        // 2. 即時讀取雲端資料庫並渲染所有列表與庫存數字
+        db.collection("inventory").onSnapshot((snapshot) => {
+            // 抓取畫面上所有的列表容器
+            const listGel = document.getElementById('list-detail-gel');
+            const listLash = document.getElementById('list-detail-lash');
+            const listNailConsumable = document.getElementById('list-detail-nail-consumable'); 
+            const listLashConsumable = document.getElementById('list-detail-lash-consumable');
+            
+            const stockGel = document.getElementById('stocktaking-gel');
+            const stockLash = document.getElementById('stocktaking-lash');
+            const stockNailConsumable = document.getElementById('stocktaking-nail-consumable');
+            const stockLashConsumable = document.getElementById('stocktaking-lash-consumable');
+            const listEquipment = document.getElementById('list-detail-equipment');
+            const listGeneral = document.getElementById('list-detail-general');
+            const stockEquipment = document.getElementById('stocktaking-equipment');
+            const stockGeneral = document.getElementById('stocktaking-general');
+
+            // 準備分類計數器與警告陣列
+            let counts = { gel: 0, nailConsumable: 0, lash: 0, lashConsumable: 0, equipment: 0, general: 0 };
+            let warnings = []; 
+            window.allInventoryData = []; // 儲存所有資料供即時搜尋使用
+
+            // 每次資料變動前先清空，避免重複疊加
+            if(listGel) listGel.innerHTML = '';
+            if(listLash) listLash.innerHTML = '';
+            if(listNailConsumable) listNailConsumable.innerHTML = '';
+            if(listLashConsumable) listLashConsumable.innerHTML = '';
+            if(stockGel) stockGel.innerHTML = '';
+            if(stockLash) stockLash.innerHTML = '';
+            if(stockNailConsumable) stockNailConsumable.innerHTML = '';
+            if(stockLashConsumable) stockLashConsumable.innerHTML = '';
+            if(listEquipment) listEquipment.innerHTML = '';
+            if(listGeneral) listGeneral.innerHTML = '';
+            if(stockEquipment) stockEquipment.innerHTML = '';
+            if(stockGeneral) stockGeneral.innerHTML = '';
+
+            // 走訪雲端裡的每一筆資料
+            snapshot.forEach((doc) => {
+                const data = doc.data();
+                const id = doc.id;
+                
+                // 將資料存入全域陣列，供搜尋功能使用
+                data.id = id;
+                window.allInventoryData.push(data);
+                
+                // 檢查是否觸發安全庫存警告
+                const currentStock = parseInt(data['庫存']) || 0;
+                const safeStock = parseInt(data['安全庫存']) || 0;
+                let isWarning = false;
+                
+                // 只有當填寫了安全庫存，且目前庫存小於等於安全庫存時，才觸發警告 (嚴格判斷 !== undefined 以防數值 0 被忽略)
+                if (data['安全庫存'] !== undefined && data['安全庫存'] !== "" && currentStock <= safeStock) {
+                    isWarning = true;
+                    warnings.push({
+                        id: id,
+                        category: data.category,
+                        name: data['名稱'],
+                        channel: data['購買渠道'] || '未填寫渠道',
+                        stock: currentStock,
+                        safeStock: safeStock
+                    });
+                }
+
+                // 動態產生明細卡片裡的標籤 (排除掉不該作為 tag 顯示的欄位)
+                let tagsHtml = '';
+                for (const key in data) {
+                    if (['category', '名稱', '備註', '庫存', '安全庫存', 'createdAt'].includes(key)) continue;
+                    if (data[key]) {
+                        tagsHtml += `<span class="tag">${key}: ${data[key]}</span>`;
+                    }
+                }
+
+                const noteHtml = data['備註'] ? `<div class="detail-note">備註: ${data['備註']}</div>` : '';
+                
+                // 組合【庫存明細卡片】的 HTML
+                const detailCardHtml = `
+                    <div class="detail-card">
+                        <div class="detail-header">
+                            <div class="detail-title">${data['名稱']}</div>
+                            <div style="display: flex; gap: 8px; margin-left: 10px;">
+                                <!-- 鉛筆圖示 (編輯) -->
+                                <button class="edit-btn" onclick="openEditPage('${id}')" title="編輯">
+                                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                                </button>
+                                <!-- 垃圾桶圖示 (刪除)，以紅色顯示 -->
+                                <button class="edit-btn" style="border-color: #d9534f; color: #d9534f;" onclick="deleteItem('${id}', '${data['名稱']}')" title="刪除">
+                                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="detail-tags">${tagsHtml}</div>
+                        ${noteHtml}
+                        <div class="detail-stock">
+                            <span>目前庫存: ${data['庫存'] || 0}</span>
+                        </div>
+                    </div>
+                `;
+
+                // 判斷此項目本次開啟 App 時是否已經按過「打勾」確認
+                const isCounted = window.countedSet.has(id);
+                // order: 1 會讓 flex/grid 容器把此項目排到最後面
+                const orderStyle = isCounted ? 'order: 1;' : 'order: 0;';
+                const countedClass = isCounted ? 'counted-item' : '';
+                const checkBtnStyle = isCounted 
+                    ? 'background-color: #5cb85c; color: white; border: none;' 
+                    : 'background-color: transparent; border: 1px solid var(--white-sec); color: var(--white-sec);';
+
+                // 組合【盤點計數卡片】的 HTML (包含打勾確認按鈕)
+                const stocktakingCardHtml = `
+                    <div class="stocktaking-card ${countedClass}" style="${orderStyle}">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <button style="width: 28px; height: 28px; border-radius: 50%; font-weight: bold; cursor: pointer; display: flex; justify-content: center; align-items: center; transition: all 0.3s; ${checkBtnStyle}" 
+                                onclick="markAsCounted('${id}', '${data['名稱']}', ${data['庫存'] || 0})" title="標記為已盤點確認">✓</button>
+                            <h4>${data['名稱']}</h4>
+                        </div>
+                        <div class="item-action">
+                            <button class="qty-btn" onclick="updateStock('${id}', -1)">-</button>
+                            <span class="qty-num">${data['庫存'] || 0}</span>
+                            <button class="qty-btn" onclick="updateStock('${id}', 1)">+</button>
+                        </div>
+                    </div>
+                `;
+
+                // 根據該筆資料的 category 丟進對應的畫面容器並增加計數
+                if (data.category === 'gel') {
+                    counts.gel++;
+                    if(listGel) listGel.innerHTML += detailCardHtml;
+                    if(stockGel) stockGel.innerHTML += stocktakingCardHtml;
+                } else if (data.category === 'nail-consumable') {
+                    counts.nailConsumable++;
+                    if(listNailConsumable) listNailConsumable.innerHTML += detailCardHtml;
+                    if(stockNailConsumable) stockNailConsumable.innerHTML += stocktakingCardHtml;
+                } else if (data.category === 'lash') {
+                    counts.lash++;
+                    if(listLash) listLash.innerHTML += detailCardHtml;
+                    if(stockLash) stockLash.innerHTML += stocktakingCardHtml;
+                } else if (data.category === 'lash-consumable') {
+                    counts.lashConsumable++;
+                    if(listLashConsumable) listLashConsumable.innerHTML += detailCardHtml;
+                    if(stockLashConsumable) stockLashConsumable.innerHTML += stocktakingCardHtml;
+                } else if (data.category === 'equipment') {
+                    counts.equipment++;
+                    if(listEquipment) listEquipment.innerHTML += detailCardHtml;
+                    if(stockEquipment) stockEquipment.innerHTML += stocktakingCardHtml;
+                } else if (data.category === 'general-consumable') {
+                    counts.general++;
+                    if(listGeneral) listGeneral.innerHTML += detailCardHtml;
+                    if(stockGeneral) stockGeneral.innerHTML += stocktakingCardHtml;
+                }
+            });
+
+            // 渲染庫存預警區塊
+            const warningArea = document.getElementById('dynamic-warning-area');
+            if (warningArea) {
+                if (warnings.length > 0) {
+                    // 定義分類名稱對照表，讓英文 ID 轉成中文標籤
+                    const categoryMap = {
+                        'gel': '凝膠',
+                        'nail-consumable': '美甲耗材',
+                        'lash': '睫毛',
+                        'lash-consumable': '美睫耗材',
+                        'equipment': '工具設備',
+                        'general-consumable': '一般消耗'
+                    };
+
+                    let warningItemsHtml = warnings.map(w => {
+                        const catName = categoryMap[w.category] || '其他';
+                        return `
+                            <div style="background: rgba(255,255,255,0.7); border-radius: 8px; padding: 12px; margin-bottom: 12px; border-left: 4px solid #d9534f; display: flex; justify-content: space-between; align-items: center;">
+                                <div>
+                                    <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 4px;">
+                                        <span style="background: #d9534f; color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: bold;">${catName}</span>
+                                        <span style="color: var(--white-main); font-weight: bold; font-size: 1rem;">${w.name}</span>
+                                    </div>
+                                    <div style="font-size: 0.85rem; color: var(--white-sec);">
+                                        目前: <span style="color: #d9534f; font-weight: bold; font-size: 1rem;">${w.stock}</span> / 安全水位: ${w.safeStock}
+                                        <br><span style="color: var(--gold-main);">渠道: ${w.channel}</span>
+                                    </div>
+                                </div>
+                                <div style="display: flex; gap: 6px; align-items: center;">
+                                    <!-- 快速 +1 按鈕 -->
+                                    <button onclick="updateStock('${w.id}', 1)" style="background: var(--gold-main); color: white; border: none; border-radius: 6px; width: 32px; height: 32px; font-size: 1.2rem; cursor: pointer; display: flex; justify-content: center; align-items: center;" title="快速補充+1">+</button>
+                                    <!-- 編輯按鈕 -->
+                                    <button onclick="openEditPage('${w.id}')" style="background: transparent; border: 1px solid var(--gold-main); color: var(--gold-main); border-radius: 6px; padding: 6px; cursor: pointer; display: flex; justify-content: center; align-items: center;" title="編輯">
+                                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                                    </button>
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+
+                    // 改變預警卡片的整體底色，使其看起來更有警示感
+                    warningArea.innerHTML = `
+                        <div class="warning-card" style="flex-direction: column; align-items: stretch; gap: 12px; background-color: rgba(217, 83, 79, 0.08); border-color: rgba(217, 83, 79, 0.3);">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <h3 style="color: #d9534f; margin:0; display: flex; align-items: center; gap: 6px;">
+                                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                                    庫存不足警告 (${warnings.length})
+                                </h3>
+                                <button class="warning-btn" style="background-color: #d9534f;" onclick="switchPage('page-stocktaking')">全部盤點</button>
+                            </div>
+                            <div style="margin-top: 8px;">
+                                ${warningItemsHtml}
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    warningArea.innerHTML = ''; // 如果沒有警告就清空區塊
+                }
+            }
+
+            // 更新畫面上所有的庫存數字
+            const updateCountText = (elId, num) => {
+                const el = document.getElementById(elId);
+                if (el) el.innerText = num + ' 項庫存';
+            };
+
+            // 首頁四大類更新
+            updateCountText('count-main-nail', counts.gel + counts.nailConsumable);
+            updateCountText('count-main-lash', counts.lash + counts.lashConsumable);
+            updateCountText('count-main-equipment', counts.equipment);
+            updateCountText('count-main-general', counts.general);
+
+            // 子頁面細項更新
+            updateCountText('count-gel', counts.gel);
+            updateCountText('count-nail-consumable', counts.nailConsumable);
+            updateCountText('count-lash', counts.lash);
+            updateCountText('count-lash-consumable', counts.lashConsumable);
+            
+            // 若目前停留在搜尋頁面，資料更新時自動同步刷新搜尋結果
+            if (typeof window.executeSearch === 'function') {
+                window.executeSearch();
+            }
+            
+            // 隨時驗證盤點完成進度 (防呆：確保載入資料後才浮現完成按鈕)
+            if (typeof window.checkAllCountedStatus === 'function') {
+                window.checkAllCountedStatus();
+            }
+        });
+
+        // 定義全域函數：刪除雲端資料庫中的項目
+        window.deleteItem = function(docId, itemName) {
+            // 跳出確認視窗，避免誤觸
+            if (confirm(`確定要刪除「${itemName}」嗎？\n此動作無法復原。`)) {
+                db.collection("inventory").doc(docId).delete()
+                .then(() => {
+                    // 刪除成功後不需特別重整，onSnapshot 會自動更新畫面
+                })
+                .catch((error) => {
+                    alert("刪除失敗：" + error.message);
+                });
+            }
+        };
+
+        // ==========================================
+        // 搜尋與篩選功能
+        // ==========================================
+        window.executeSearch = function() {
+            const keyword = document.getElementById('search-input').value.toLowerCase().trim();
+            const category = document.getElementById('search-category').value;
+            const resultsList = document.getElementById('search-results-list');
+            const resultCount = document.getElementById('search-result-count');
+            
+            if (!resultsList) return; // 確保元素存在
+            resultsList.innerHTML = '';
+            
+            if (!window.allInventoryData) return;
+            
+            // 透過過濾器進行智慧文字比對
+            const filteredData = window.allInventoryData.filter(item => {
+                const matchCategory = category === "" || item.category === category;
+                // 將所有想搜尋的文字合併在一起比對
+                const searchString = `${item['名稱'] || ''} ${item['品牌'] || ''} ${item['規格'] || ''} ${item['購買渠道'] || ''} ${item['種類'] || ''} ${item['備註'] || ''}`.toLowerCase();
+                const matchKeyword = keyword === "" || searchString.includes(keyword);
+                return matchCategory && matchKeyword;
+            });
+            
+            resultCount.innerText = filteredData.length;
+            
+            // 生成結果卡片 (繼承了管理者防護，一般人員在此頁面也不會看到編輯/刪除)
+            filteredData.forEach(data => {
+                let tagsHtml = '';
+                for (const key in data) {
+                    if (['id', 'category', '名稱', '備註', '庫存', '安全庫存', 'createdAt', 'lastCheckedAt'].includes(key)) continue;
+                    if (data[key]) {
+                        tagsHtml += `<span class="tag">${key}: ${data[key]}</span>`;
+                    }
+                }
+                const noteHtml = data['備註'] ? `<div class="detail-note">備註: ${data['備註']}</div>` : '';
+                
+                const cardHtml = `
+                    <div class="detail-card">
+                        <div class="detail-header">
+                            <div class="detail-title">${data['名稱']}</div>
+                            <div class="admin-only" style="display: flex; gap: 8px; margin-left: 10px;">
+                                <button class="edit-btn" onclick="openEditPage('${data.id}')" title="編輯">
+                                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                                </button>
+                                <button class="edit-btn" style="border-color: #d9534f; color: #d9534f;" onclick="deleteItem('${data.id}', '${data['名稱']}')" title="刪除">
+                                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2-2v2"></path></svg>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="detail-tags">${tagsHtml}</div>
+                        ${noteHtml}
+                        <div class="detail-stock">
+                            <span>目前庫存: ${data['庫存'] || 0}</span>
+                        </div>
+                    </div>
+                `;
+                resultsList.innerHTML += cardHtml;
+            });
+        };
+
+        // 3. 處理新增頁面的動態欄位切換
+        const categorySelect = document.getElementById('add-category-select');
+        const dynamicFields = document.getElementById('dynamic-form-fields');
+        const submitBtn = document.getElementById('btn-submit-add');
+
+        categorySelect.addEventListener('change', (e) => {
+            const val = e.target.value;
+            let html = '';
+            
+            if (val === 'gel') {
+                html = `
+                    <div class="form-group"><label>功能</label><input type="text" class="form-input"></div>
+                    <div class="form-group"><label>品牌</label><input type="text" class="form-input"></div>
+                    <div class="form-group"><label>名稱</label><input type="text" class="form-input" required></div>
+                    <div class="form-group"><label>容量</label><input type="text" class="form-input"></div>
+                    <div class="form-group"><label>價格</label><input type="number" class="form-input" required></div>
+                    <div class="form-group"><label>購買渠道</label><input type="text" class="form-input"></div>
+                    <div class="form-group"><label>庫存</label><input type="number" class="form-input" required></div>
+                    <div class="form-group"><label>安全庫存 (非必填)</label><input type="number" class="form-input" placeholder="低於此數字會警告"></div>
+                    <div class="form-group"><label>有無中標</label><select class="form-input"><option>有</option><option>無</option></select></div>
+                    <div class="form-group"><label>備註 (非必填)</label><input type="text" class="form-input"></div>
+                `;
+                submitBtn.style.display = 'block';
+            } else if (val === 'lash') {
+                html = `
+                    <div class="form-group"><label>種類</label><select class="form-input"><option>單根</option><option>小絨花</option><option>YY</option><option>三葉草</option><option>四葉草</option><option>山茶花</option><option>焦糖</option><option>下睫毛</option></select></div>
+                    <div class="form-group"><label>粗細度</label><input type="text" class="form-input"></div>
+                    <div class="form-group"><label>捲度</label><select class="form-input"><option>嬰兒直</option><option>嬰兒彎</option><option>J</option><option>B</option><option>C</option><option>D</option><option>L</option><option>L彎</option><option>LJ</option><option>LB</option><option>LC</option><option>LD</option></select></div>
+                    <div class="form-group"><label>長度</label><select class="form-input"><option>6</option><option>7</option><option>8</option><option>9</option><option>10</option><option>11</option><option>12</option><option>13</option><option>14</option><option>15</option></select></div>
+                    <div class="form-group"><label>價格</label><input type="number" class="form-input"></div>
+                    <div class="form-group"><label>購買渠道</label><input type="text" class="form-input"></div>
+                    <div class="form-group"><label>庫存</label><input type="number" class="form-input" required></div>
+                    <div class="form-group"><label>安全庫存 (非必填)</label><input type="number" class="form-input" placeholder="低於此數字會警告"></div>
+                    <div class="form-group"><label>備註 (非必填)</label><input type="text" class="form-input"></div>
+                `;
+                submitBtn.style.display = 'block';
+            } else if (val === 'nail-consumable' || val === 'lash-consumable' || val === 'equipment' || val === 'general-consumable') {
+                html = `
+                    <div class="form-group"><label>品牌 (非必填)</label><input type="text" class="form-input"></div>
+                    <div class="form-group"><label>名稱</label><input type="text" class="form-input" required></div>
+                    <div class="form-group"><label>規格 (非必填)</label><input type="text" class="form-input"></div>
+                    <div class="form-group"><label>價格</label><input type="number" class="form-input" required></div>
+                    <div class="form-group"><label>購買渠道 (非必填)</label><input type="text" class="form-input"></div>
+                    <div class="form-group"><label>庫存</label><input type="number" class="form-input" required></div>
+                    <div class="form-group"><label>安全庫存 (非必填)</label><input type="number" class="form-input" placeholder="低於此數字會警告"></div>
+                    <div class="form-group"><label>備註 (非必填)</label><input type="text" class="form-input"></div>
+                `;
+                submitBtn.style.display = 'block';
+            } else {
+                html = '';
+                submitBtn.style.display = 'none';
+            }
+            dynamicFields.innerHTML = html;
+        });
+
+        // 4. 將新增的商品資料寫入 Firebase 雲端資料庫
+        submitBtn.addEventListener('click', () => {
+            try {
+                const category = categorySelect.value;
+                const inputs = dynamicFields.querySelectorAll('.form-input');
+                
+                // 建立要上傳的資料物件
+                let newItem = { 
+                    category: category, 
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp() 
+                };
+                
+                // 自動抓取表單裡的所有欄位與數值
+                let hasEmptyRequired = false;
+                inputs.forEach(input => {
+                    // 安全抓取標籤：找父元素裡的 label
+                    const parentDiv = input.closest('.form-group');
+                    if (!parentDiv) return;
+                    const labelElement = parentDiv.querySelector('label');
+                    if (!labelElement) return;
+
+                    const labelName = labelElement.innerText.replace(' (非必填)', '').trim();
+                    newItem[labelName] = input.value;
+                    
+                    // 檢查必填欄位，如果沒填就將該欄位框線變紅色
+                    if(input.required && !input.value) {
+                        hasEmptyRequired = true;
+                        input.style.border = "2px solid #d9534f"; 
+                    } else {
+                        input.style.border = "1px solid var(--border-base)"; // 恢復原狀
+                    }
+                });
+
+                if (hasEmptyRequired) {
+                    alert("請將必填欄位填寫完整！（紅色框線處）");
+                    return;
+                }
+
+                // 【重點】如果是睫毛，自動組合名稱欄位
+                if (category === 'lash') {
+                    const type = newItem['種類'] || '';
+                    const thick = newItem['粗細度'] || '';
+                    const length = newItem['長度'] || '';
+                    const curl = newItem['捲度'] || '';
+                    newItem['名稱'] = `${type} ${thick} ${length} ${curl}`.trim();
+                }
+
+                // 送出至 Firebase
+                db.collection("inventory").add(newItem)
+                .then((docRef) => {
+                    alert(`成功新增：${newItem['名稱']}`);
+                    
+                    // 僅清空剛填寫的各個輸入框，保留主分類，不跳轉頁面
+                    inputs.forEach(input => {
+                        if (input.tagName === 'SELECT') {
+                            input.selectedIndex = 0; 
+                        } else {
+                            input.value = ''; 
+                        }
+                    });
+                    
+                    document.getElementById('page-add').scrollTo({ top: 0, behavior: 'smooth' });
+                    
+                }).catch((error) => {
+                    // 捕捉權限不足等 Firebase 錯誤
+                    alert("寫入失敗，遭雲端拒絕：" + error.message);
+                });
+
+            } catch (err) {
+                // 捕捉任何 JavaScript 隱藏錯誤
+                alert("程式執行發生嚴重錯誤：" + err.message);
+            }
+        });
+
+        // 5. 完善編輯功能：讀取資料並畫出編輯表單
+        let currentEditId = null;
+        let currentEditCategory = null;
+
+        window.openEditPage = function(docId) {
+            db.collection("inventory").doc(docId).get().then((doc) => {
+                if (doc.exists) {
+                    const data = doc.data();
+                    currentEditId = docId;
+                    currentEditCategory = data.category;
+                    
+                    const editFields = document.getElementById('edit-dynamic-form-fields');
+                    let html = '';
+                    
+                    // 根據分類生成對應表單，並填入既有數值
+                    const val = data.category;
+                    const getValue = (key) => data[key] !== undefined ? data[key] : '';
+
+                    if (val === 'gel') {
+                        html = `
+                            <div class="form-group"><label>功能</label><input type="text" class="form-input" value="${getValue('功能')}"></div>
+                            <div class="form-group"><label>品牌</label><input type="text" class="form-input" value="${getValue('品牌')}"></div>
+                            <div class="form-group"><label>名稱</label><input type="text" class="form-input" required value="${getValue('名稱')}"></div>
+                            <div class="form-group"><label>容量</label><input type="text" class="form-input" value="${getValue('容量')}"></div>
+                            <div class="form-group"><label>價格</label><input type="number" class="form-input" required value="${getValue('價格')}"></div>
+                            <div class="form-group"><label>購買渠道</label><input type="text" class="form-input" value="${getValue('購買渠道')}"></div>
+                            <div class="form-group"><label>庫存</label><input type="number" class="form-input" required value="${getValue('庫存')}"></div>
+                            <div class="form-group"><label>安全庫存 (非必填)</label><input type="number" class="form-input" placeholder="低於此數字會警告" value="${getValue('安全庫存')}"></div>
+                            <div class="form-group"><label>有無中標</label><select class="form-input" id="edit-select-label"><option>有</option><option>無</option></select></div>
+                            <div class="form-group"><label>備註 (非必填)</label><input type="text" class="form-input" value="${getValue('備註')}"></div>
+                        `;
+                    } else if (val === 'lash') {
+                        html = `
+                            <div class="form-group"><label>種類</label><select class="form-input" id="edit-select-type"><option>單根</option><option>小絨花</option><option>YY</option><option>三葉草</option><option>四葉草</option><option>山茶花</option><option>焦糖</option><option>下睫毛</option></select></div>
+                            <div class="form-group"><label>粗細度</label><input type="text" class="form-input" value="${getValue('粗細度')}"></div>
+                            <div class="form-group"><label>捲度</label><select class="form-input" id="edit-select-curl"><option>嬰兒直</option><option>嬰兒彎</option><option>J</option><option>B</option><option>C</option><option>D</option><option>L</option><option>L彎</option><option>LJ</option><option>LB</option><option>LC</option><option>LD</option></select></div>
+                            <div class="form-group"><label>長度</label><select class="form-input" id="edit-select-length"><option>6</option><option>7</option><option>8</option><option>9</option><option>10</option><option>11</option><option>12</option><option>13</option><option>14</option><option>15</option></select></div>
+                            <div class="form-group"><label>價格</label><input type="number" class="form-input" value="${getValue('價格')}"></div>
+                            <div class="form-group"><label>購買渠道</label><input type="text" class="form-input" value="${getValue('購買渠道')}"></div>
+                            <div class="form-group"><label>庫存</label><input type="number" class="form-input" required value="${getValue('庫存')}"></div>
+                            <div class="form-group"><label>安全庫存 (非必填)</label><input type="number" class="form-input" placeholder="低於此數字會警告" value="${getValue('安全庫存')}"></div>
+                            <div class="form-group"><label>備註 (非必填)</label><input type="text" class="form-input" value="${getValue('備註')}"></div>
+                        `;
+                    } else {
+                        html = `
+                            <div class="form-group"><label>品牌 (非必填)</label><input type="text" class="form-input" value="${getValue('品牌')}"></div>
+                            <div class="form-group"><label>名稱</label><input type="text" class="form-input" required value="${getValue('名稱')}"></div>
+                            <div class="form-group"><label>規格 (非必填)</label><input type="text" class="form-input" value="${getValue('規格')}"></div>
+                            <div class="form-group"><label>價格</label><input type="number" class="form-input" required value="${getValue('價格')}"></div>
+                            <div class="form-group"><label>購買渠道 (非必填)</label><input type="text" class="form-input" value="${getValue('購買渠道')}"></div>
+                            <div class="form-group"><label>庫存</label><input type="number" class="form-input" required value="${getValue('庫存')}"></div>
+                            <div class="form-group"><label>安全庫存 (非必填)</label><input type="number" class="form-input" placeholder="低於此數字會警告" value="${getValue('安全庫存')}"></div>
+                            <div class="form-group"><label>備註 (非必填)</label><input type="text" class="form-input" value="${getValue('備註')}"></div>
+                        `;
+                    }
+                    editFields.innerHTML = html;
+                    document.getElementById('btn-submit-edit').style.display = 'block';
+                    
+                    // 把下拉選單選回當時儲存的數值
+                    if(val === 'gel' && data['有無中標']) document.getElementById('edit-select-label').value = data['有無中標'];
+                    if(val === 'lash') {
+                        if(data['種類']) document.getElementById('edit-select-type').value = data['種類'];
+                        if(data['捲度']) document.getElementById('edit-select-curl').value = data['捲度'];
+                        if(data['長度']) document.getElementById('edit-select-length').value = data['長度'];
+                    }
+
+                    switchPage('page-edit');
+                }
+            }).catch(error => alert("讀取資料失敗: " + error));
+        };
+
+        // 6. 執行編輯後的儲存寫入
+        document.getElementById('btn-submit-edit').addEventListener('click', () => {
+            const editFields = document.getElementById('edit-dynamic-form-fields');
+            const inputs = editFields.querySelectorAll('.form-input');
+            
+            let updateItem = {};
+            let hasEmptyRequired = false;
+            
+            inputs.forEach(input => {
+                // 安全抓取標籤：找父元素裡的 label
+                const parentDiv = input.closest('.form-group');
+                if (!parentDiv) return;
+                const labelElement = parentDiv.querySelector('label');
+                if (!labelElement) return;
+
+                const labelName = labelElement.innerText.replace(' (非必填)', '').trim();
+                updateItem[labelName] = input.value;
+                
+                if(input.required && !input.value) {
+                    hasEmptyRequired = true;
+                    input.style.border = "2px solid #d9534f"; 
+                } else {
+                    input.style.border = "1px solid var(--border-base)";
+                }
+            });
+
+            if (hasEmptyRequired) {
+                alert("請將必填欄位填寫完整！");
+                return;
+            }
+
+            // 同樣處理睫毛的名稱重組
+            if (currentEditCategory === 'lash') {
+                const type = updateItem['種類'] || '';
+                const thick = updateItem['粗細度'] || '';
+                const length = updateItem['長度'] || '';
+                const curl = updateItem['捲度'] || '';
+                updateItem['名稱'] = `${type} ${thick} ${length} ${curl}`.trim();
+            }
+
+            db.collection("inventory").doc(currentEditId).update(updateItem)
+            .then(() => {
+                alert("資料修改成功！"); // 編輯成功的提示
+                switchPage('page-home');
+            })
+            .catch((error) => {
+                alert("發生錯誤：" + error.message);
+            });
+        });
+
+        // ==========================================
+        // 網頁推播通知 (Web Push) 設定
+        // ==========================================
+        // 1. 註冊 Service Worker
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function() {
+                navigator.serviceWorker.register('./sw.js').catch(function(err) {
+                    console.log('ServiceWorker 註冊失敗: ', err);
+                });
+            });
+        }
+
+        // 2. 請求推播通知權限
+        window.requestNotificationPermission = function() {
+            if (!("Notification" in window)) {
+                alert("您的瀏覽器不支援推播通知");
+                return;
+            }
+            Notification.requestPermission().then(permission => {
+                if (permission === "granted") {
+                    alert("✅ 已成功開啟推播通知權限！");
+                } else {
+                    alert("❌ 權限被拒絕，請到手機瀏覽器設定中手動開啟。");
+                }
+            });
+        };
+
+        // 3. 觸發原生推播通知的函數
+        function sendLocalPush(title, body) {
+            if (Notification.permission === "granted") {
+                navigator.serviceWorker.ready.then(registration => {
+                    registration.showNotification(title, {
+                        body: body,
+                        icon: "./logo.png",
+                        vibrate: [200, 100, 200, 100, 200], // 手機震動模式
+                        tag: "low-stock-alert" // 同樣標籤會覆蓋舊通知，避免通知狂洗版
+                    });
+                });
+            }
+        }
+
+        // ==========================================
+        // APP 內建歷史紀錄瀏覽 (大項/細項 折疊機制)
+        // ==========================================
+        window.toggleHistoryDetail = function(index) {
+            const detailDiv = document.getElementById(`history-detail-${index}`);
+            const arrowSpan = document.getElementById(`history-arrow-${index}`);
+            if (detailDiv.style.display === 'none') {
+                detailDiv.style.display = 'block';
+                arrowSpan.innerText = '▲';
+            } else {
+                detailDiv.style.display = 'none';
+                arrowSpan.innerText = '▼';
+            }
+        };
+
+        window.loadHistoryData = function() {
+            const listContainer = document.getElementById('history-grouped-list');
+            listContainer.innerHTML = '<div style="text-align:center; padding:20px; color:var(--white-sec);">讀取資料中，請稍候...</div>';
+
+            // 抓取最新的 300 筆變動紀錄
+            db.collection("inventory_history").orderBy("timestamp", "desc").limit(300).get().then(snapshot => {
+                if (snapshot.empty) {
+                    listContainer.innerHTML = '<div style="text-align:center; padding:20px; color:var(--white-sec);">目前無任何變動紀錄。</div>';
+                    return;
+                }
+
+                // 根據「商品名稱」進行分群 (大項)
+                const grouped = {};
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    const groupKey = data.itemName || '其他異動';
+                    if (!grouped[groupKey]) grouped[groupKey] = [];
+                    grouped[groupKey].push(data);
+                });
+
+                let html = '';
+                let index = 0;
+                
+                // 將整理好的群組轉化為卡片與折疊細項
+                for (const key in grouped) {
+                    const records = grouped[key];
+                    const isBatch = key.includes('【完成'); // 若為盤點總結，改變底色凸顯
+                    
+                    html += `
+                        <div class="detail-card" style="padding: 0; overflow: hidden; margin-bottom: 12px; border: 1px solid var(--border-base);">
+                            <!-- 大項標題列 (點擊可展開) -->
+                            <div style="padding: 16px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; background: ${isBatch ? 'rgba(138,109,59,0.1)' : 'var(--card-bg)'};" onclick="toggleHistoryDetail(${index})">
+                                <div style="font-weight: bold; color: var(--white-main); font-size: 1.05rem;">
+                                    ${key} <span style="font-size: 0.85rem; color: var(--white-sec); font-weight: normal; margin-left: 8px;">(共 ${records.length} 筆紀錄)</span>
+                                </div>
+                                <div id="history-arrow-${index}" style="color: var(--white-sec); font-size: 0.9rem;">▼</div>
+                            </div>
+                            
+                            <!-- 細項內容列 (預設隱藏) -->
+                            <div id="history-detail-${index}" style="display: none; border-top: 1px solid var(--border-base); background-color: rgba(255,255,255,0.6);">
+                                <ul style="list-style: none; padding: 0; margin: 0;">
+                    `;
+                    
+                    records.forEach(r => {
+                        const timeStr = r.timestamp ? r.timestamp.toDate().toLocaleString([], {month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}) : '未知時間';
+                        // 若有數量變動，顯示綠色加號或紅色減號
+                        const changeStr = r.changeAmount !== 0 ? ` <span style="color:${r.changeAmount > 0 ? '#5cb85c' : '#d9534f'}; font-weight:bold;">(${r.changeAmount > 0 ? '+' : ''}${r.changeAmount})</span>` : '';
+                        
+                        html += `
+                                    <li style="padding: 12px 16px; border-bottom: 1px dashed rgba(201,184,150,0.5);">
+                                        <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                                            <span style="font-size: 0.85rem; color: var(--white-sec);">${timeStr}</span>
+                                            <span style="font-size: 0.85rem; color: var(--gold-main);">${r.user}</span>
+                                        </div>
+                                        <div style="font-size: 0.95rem; color: var(--white-main); line-height: 1.4;">
+                                            ${r.reason}${changeStr}
+                                            ${r.changeAmount !== 0 ? `<div style="font-size:0.85rem; color:var(--white-sec); margin-top:4px;">變動後庫存: ${r.newStock}</div>` : ''}
+                                        </div>
+                                    </li>
+                        `;
+                    });
+
+                    html += `
+                                </ul>
+                            </div>
+                        </div>
+                    `;
+                    index++;
+                }
+
+                listContainer.innerHTML = html;
+            }).catch(err => {
+                listContainer.innerHTML = `<div style="color:#d9534f; text-align:center;">載入失敗: ${err.message}</div>`;
+            });
+        };
+
+        // ==========================================
+        // 匯出報表功能 (CSV)
+        // ==========================================
+        window.exportToCSV = async function() {
+            try {
+                const snapshot = await db.collection("inventory").get();
+                let csvContent = "\uFEFF分類,名稱,品牌,價格,目前庫存,安全庫存,購買渠道\n";
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    csvContent += `${data.category || ''},${data['名稱'] || ''},${data['品牌'] || ''},${data['價格'] || ''},${data['庫存'] || 0},${data['安全庫存'] || ''},${data['購買渠道'] || ''}\n`;
+                });
+                downloadBlob(csvContent, '繆米美學_目前庫存狀態.csv', 'text/csv;charset=utf-8;');
+            } catch (error) {
+                alert("匯出失敗：" + error.message);
+            }
+        };
+
+        window.exportHistoryCSV = async function() {
+            try {
+                const snapshot = await db.collection("inventory_history").orderBy("timestamp", "desc").limit(100).get();
+                let csvContent = "\uFEFF變動時間,項目名稱,變動數量,變動後庫存,操作人員,變動原因\n";
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    const timeString = data.timestamp ? data.timestamp.toDate().toLocaleString() : '未知時間';
+                    csvContent += `${timeString},${data.itemName || ''},${data.changeAmount || 0},${data.newStock || 0},${data.user || ''},${data.reason || ''}\n`;
+                });
+                downloadBlob(csvContent, '繆米美學_庫存歷史變動紀錄.csv', 'text/csv;charset=utf-8;');
+            } catch (error) {
+                alert("匯出紀錄失敗：" + error.message);
+            }
+        };
+
+        function downloadBlob(content, filename, contentType) {
+            const blob = new Blob([content], { type: contentType });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = url;
+            link.setAttribute("download", filename);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // ==========================================
+        // 取消盤點功能 (叉叉按鈕) 與 驗證全部打勾
+        // ==========================================
+        window.cancelStocktake = function() {
+            if (confirm("如果關閉將不儲存盤點資料，確定要關閉嗎？")) {
+                // 清除打勾狀態
+                window.countedSet.clear();
+                
+                // 清除畫面上所有項目的綠色標記樣式
+                document.querySelectorAll('.stocktaking-card').forEach(card => {
+                    card.classList.remove('counted-item');
+                    card.style.order = '0';
+                    const btn = card.querySelector('button');
+                    if(btn && btn.innerText === '✓') {
+                        btn.style.backgroundColor = 'transparent';
+                        btn.style.color = 'var(--white-sec)';
+                        btn.style.border = '1px solid var(--white-sec)';
+                    }
+                });
+                
+                // 退回無排程/初始狀態
+                checkTodayStocktaking();
+            }
+        };
+
+        window.checkAllCountedStatus = function() {
+            const finishBtnContainer = document.getElementById('finish-stocktake-container');
+            if (!finishBtnContainer || !window.allInventoryData) return;
+            
+            if (window.currentStocktakeMode === 'none') {
+                finishBtnContainer.style.display = 'none';
+                return;
+            }
+            
+            // 找出本次盤點應出現的所有項目
+            const requiredItems = window.allInventoryData.filter(item => window.currentActiveCats.includes(item.category));
+            // 找出其中還沒打勾的項目
+            const uncountedItems = requiredItems.filter(item => !window.countedSet.has(item.id));
+            
+            // 需盤點項目大於0，且未盤點數量為0時，才顯示完成按鈕 (按鈕現在會出現在最上面)
+            if (requiredItems.length > 0 && uncountedItems.length === 0) {
+                finishBtnContainer.style.display = 'block';
+            } else {
+                finishBtnContainer.style.display = 'none';
+            }
+
+            // 類別完成自動排到底部邏輯與隱藏空分類
+            const groupMap = {
+                'gel': ['title-stock-gel', 'stocktaking-gel'],
+                'nail-consumable': ['title-stock-nail-consumable', 'stocktaking-nail-consumable'],
+                'lash': ['title-stock-lash', 'stocktaking-lash'],
+                'lash-consumable': ['title-stock-lash-consumable', 'stocktaking-lash-consumable'],
+                'equipment': ['title-stock-equipment', 'stocktaking-equipment'],
+                'general-consumable': ['title-stock-general', 'stocktaking-general']
+            };
+
+            window.currentActiveCats.forEach(cat => {
+                const catItems = window.allInventoryData.filter(item => item.category === cat);
+                const uncountedInCat = catItems.filter(item => !window.countedSet.has(item.id));
+
+                const titleEl = document.getElementById(groupMap[cat][0]);
+                const listEl = document.getElementById(groupMap[cat][1]);
+
+                if (titleEl && listEl) {
+                    if (catItems.length === 0) {
+                        // 如果該分類完全沒有商品，直接隱藏
+                        titleEl.style.display = 'none';
+                        listEl.style.display = 'none';
+                    } else {
+                        titleEl.style.display = 'block';
+                        listEl.style.display = 'flex';
+
+                        if (uncountedInCat.length === 0) {
+                            // 該分類盤點完畢，加上 completed-category 讓標題與列表一起排到最後
+                            titleEl.classList.add('completed-category', 'completed-category-title');
+                            listEl.classList.add('completed-category');
+                        } else {
+                            titleEl.classList.remove('completed-category', 'completed-category-title');
+                            listEl.classList.remove('completed-category');
+                        }
+                    }
+                }
+            });
+        };
+
+        // ==========================================
+        // 盤點打勾功能 (支援再次點擊取消)
+        // ==========================================
+        window.markAsCounted = function(docId, itemName, currentStock) {
+            // 如果已經打勾過，代表這次點擊是「誤觸要取消」
+            if (window.countedSet.has(docId)) {
+                window.countedSet.delete(docId); // 從已盤點名單中移除
+                window.checkAllCountedStatus();  // 立即檢查是否要隱藏完成按鈕
+                
+                db.collection("inventory_history").add({
+                    itemId: docId,
+                    itemName: itemName,
+                    changeAmount: 0,
+                    newStock: currentStock,
+                    user: currentUser ? currentUser.email : '未登入訪客',
+                    reason: '取消打勾確認 (誤觸復原)',
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                }).then(() => {
+                    db.collection("inventory").doc(docId).update({ lastCheckedAt: firebase.firestore.FieldValue.serverTimestamp() });
+                });
+                
+            } else {
+                // 尚未打勾，執行正常打勾邏輯
+                window.countedSet.add(docId);
+                window.checkAllCountedStatus(); // 立即檢查是否所有項目都已打勾，若是則顯示按鈕
+                
+                db.collection("inventory_history").add({
+                    itemId: docId,
+                    itemName: itemName,
+                    changeAmount: 0,
+                    newStock: currentStock,
+                    user: currentUser ? currentUser.email : '未登入訪客',
+                    reason: '打勾確認盤點無誤',
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                }).then(() => {
+                    db.collection("inventory").doc(docId).update({ lastCheckedAt: firebase.firestore.FieldValue.serverTimestamp() });
+                });
+            }
+        };
+
+        // ==========================================
+        // 管理者專用：新增與刪除帳號 (透過次要實例避免登出)
+        // ==========================================
+        window.createNewUser = function() {
+            const email = document.getElementById('new-user-email').value;
+            const pwd = document.getElementById('new-user-pwd').value;
+            const role = document.getElementById('new-user-role').value;
+            if(!email || pwd.length < 6) return alert("請填寫信箱，且密碼至少需6碼。");
+            
+            // 由於直接使用 auth.createUser 會將當前管理員強制登出
+            // 這裡使用 Firebase 建立次要應用程式實例來背後註冊新帳號
+            const secondaryApp = firebase.initializeApp(firebaseConfig, "SecondaryApp");
+            
+            secondaryApp.auth().createUserWithEmailAndPassword(email, pwd)
+                .then((userCredential) => {
+                    // 註冊成功後，將權限寫入自訂的 app_users 集合
+                    return db.collection("app_users").doc(email.toLowerCase()).set({
+                        email: email.toLowerCase(),
+                        role: role,
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                })
+                .then(() => {
+                    alert(`帳號 ${email} 建立成功！`);
+                    document.getElementById('new-user-email').value = '';
+                    document.getElementById('new-user-pwd').value = '';
+                    secondaryApp.auth().signOut();
+                    secondaryApp.delete(); // 清除次要實例
+                    loadAccountList(); // 重新整理列表
+                })
+                .catch(err => {
+                    alert("建立帳號失敗：" + err.message);
+                    secondaryApp.delete();
+                });
+        };
+
+        window.loadAccountList = function() {
+            db.collection("app_users").get().then(snapshot => {
+                const list = document.getElementById('account-list');
+                list.innerHTML = '';
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    // 保護機制：不允許從這裡直接刪除自己(當前登入者)
+                    const isSelf = currentUser && currentUser.email.toLowerCase() === data.email;
+                    const delBtnHtml = isSelf ? 
+                        `<span style="color:var(--white-sec); font-size:0.8rem;">(本人)</span>` : 
+                        `<button class="edit-btn" style="border-color:#d9534f; color:#d9534f;" onclick="deleteAppUser('${doc.id}', '${data.email}')">刪除權限</button>`;
+                        
+                    list.innerHTML += `
+                        <div class="stocktaking-card" style="margin-bottom:10px;">
+                            <div>
+                                <div style="color:var(--white-main); font-weight:bold;">${data.email}</div>
+                                <div style="font-size:0.8rem; color:var(--white-sec);">${data.role === 'admin' ? '管理員' : '一般帳號'}</div>
+                            </div>
+                            <div>${delBtnHtml}</div>
+                        </div>
+                    `;
+                });
+            });
+        };
+
+        window.deleteAppUser = function(docId, email) {
+            if(confirm(`確定要刪除/撤銷「${email}」的系統登入權限嗎？\n(移除後該帳號將會被強制登出且無法再進入)`)) {
+                db.collection("app_users").doc(docId).delete().then(() => {
+                    alert("權限刪除成功");
+                    loadAccountList();
+                });
+            }
+        };
+
+        // ==========================================
+        // 庫存盤點加減功能 與 觸發推播邏輯
+        // ==========================================
+        window.updateStock = function(docId, change) {
+            const docRef = db.collection("inventory").doc(docId);
+            
+            docRef.get().then((doc) => {
+                if (doc.exists) {
+                    const data = doc.data();
+                    let currentStock = parseInt(data['庫存']) || 0;
+                    let safeStock = parseInt(data['安全庫存']); 
+                    
+                    let newStock = currentStock + change;
+                    if (newStock < 0) newStock = 0; // 避免庫存變成負數
+                    
+                    docRef.update({ '庫存': newStock }).then(() => {
+                        // 寫入庫存變動歷史紀錄
+                        db.collection("inventory_history").add({
+                            itemId: docId,
+                            itemName: data['名稱'],
+                            changeAmount: change,
+                            newStock: newStock,
+                            user: currentUser ? currentUser.email : '未登入訪客',
+                            reason: '盤點異動',
+                            timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                        });
+
+                        // 判斷推播條件：有設定安全庫存、且是「扣除」動作、且剛好跌破安全水位
+                        if (!isNaN(safeStock) && change < 0) {
+                            if (currentStock > safeStock && newStock <= safeStock) {
+                                sendLocalPush("⚠️ 庫存不足警告", `「${data['名稱']}」只剩 ${newStock} 個，已達安全水位需補貨！`);
+                            }
+                        }
+                    });
+                }
+            });
+        };
+
+        // ==========================================
+        // 盤點排程設定與智慧提醒功能
+        // ==========================================
+        function loadScheduleSettings() {
+            const minorDay = localStorage.getItem('settingMinorDay') || '';
+            document.getElementById('setting-minor-day').value = minorDay;
+            const minorCats = JSON.parse(localStorage.getItem('settingMinorCats') || '["gel", "nail-consumable", "lash", "lash-consumable", "equipment", "general-consumable"]');
+            document.querySelectorAll('.setting-minor-cat').forEach(cb => {
+                cb.checked = minorCats.includes(cb.value);
+            });
+
+            const majorDay = localStorage.getItem('settingMajorDay') || '';
+            document.getElementById('setting-major-day').value = majorDay;
+            const majorCats = JSON.parse(localStorage.getItem('settingMajorCats') || '["gel", "nail-consumable", "lash", "lash-consumable", "equipment", "general-consumable"]');
+            document.querySelectorAll('.setting-major-cat').forEach(cb => {
+                cb.checked = majorCats.includes(cb.value);
+            });
+        }
+
+        window.saveScheduleSettings = function() {
+            const minorDay = document.getElementById('setting-minor-day').value;
+            const minorCats = Array.from(document.querySelectorAll('.setting-minor-cat:checked')).map(cb => cb.value);
+            localStorage.setItem('settingMinorDay', minorDay);
+            localStorage.setItem('settingMinorCats', JSON.stringify(minorCats));
+
+            const majorDay = document.getElementById('setting-major-day').value;
+            const majorCats = Array.from(document.querySelectorAll('.setting-major-cat:checked')).map(cb => cb.value);
+            localStorage.setItem('settingMajorDay', majorDay);
+            localStorage.setItem('settingMajorCats', JSON.stringify(majorCats));
+
+            alert("盤點排程已成功儲存！");
+            checkTodayStocktaking();
+            
+            // 詢問是否要同步至手機/Apple行事曆
+            if (confirm("是否要將剛設定的盤點排程，同步加入至您的手機行事曆？")) {
+                generateICS(minorDay, majorDay);
+            }
+        };
+
+        // 產生 .ics 檔案供 iOS/Android 匯入原生行事曆
+        function generateICS(minorDay, majorDay) {
+            let icsMSG = "BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//MeawMeBeauty//Stocktaking//TW\n";
+            const now = new Date();
+            
+            // 處理小盤點 (每週)
+            if (minorDay !== "") {
+                icsMSG += "BEGIN:VEVENT\n";
+                icsMSG += `DTSTART:${now.toISOString().replace(/[-:]/g, '').split('.')[0]}Z\n`;
+                const days = ["SU", "MO", "TU", "WE", "TH", "FR", "SA"];
+                icsMSG += `RRULE:FREQ=WEEKLY;BYDAY=${days[minorDay] || "MO"}\n`;
+                icsMSG += "SUMMARY:繆米美學 - 每週小盤點\n";
+                icsMSG += "DESCRIPTION:請開啟庫存管理 App 進行每週小盤點作業\n";
+                icsMSG += "END:VEVENT\n";
+            }
+            
+            // 處理大盤點 (每月)
+            if (majorDay !== "") {
+                icsMSG += "BEGIN:VEVENT\n";
+                icsMSG += `DTSTART:${now.toISOString().replace(/[-:]/g, '').split('.')[0]}Z\n`;
+                let rrule = majorDay === 'last' ? 'FREQ=MONTHLY;BYMONTHDAY=-1' : `FREQ=MONTHLY;BYMONTHDAY=${majorDay}`;
+                icsMSG += `RRULE:${rrule}\n`;
+                icsMSG += "SUMMARY:繆米美學 - 每月大盤點\n";
+                icsMSG += "DESCRIPTION:請開啟庫存管理 App 進行全品項大盤點作業\n";
+                icsMSG += "END:VEVENT\n";
+            }
+            
+            icsMSG += "END:VCALENDAR";
+            // 複用稍早建立的 downloadBlob 函數來觸發下載
+            downloadBlob(icsMSG, "MeawMeBeauty_Schedule.ics", "text/calendar;charset=utf-8;");
+        }
+
+        function checkTodayStocktaking() {
+            const now = new Date();
+            const dayOfWeek = now.getDay(); 
+            const dateOfMonth = now.getDate();
+            const isLastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate() === dateOfMonth;
+
+            // 顯示今天日期 (例如：2024年5月20日 星期一)
+            const daysArr = ['日', '一', '二', '三', '四', '五', '六'];
+            const dateStr = `${now.getFullYear()}年${now.getMonth()+1}月${dateOfMonth}日 星期${daysArr[dayOfWeek]}`;
+            const dateDisplay = document.getElementById('today-date-display');
+            if (dateDisplay) dateDisplay.innerText = dateStr;
+
+            const minorDay = localStorage.getItem('settingMinorDay');
+            const minorCats = JSON.parse(localStorage.getItem('settingMinorCats') || '[]');
+            
+            const majorDay = localStorage.getItem('settingMajorDay');
+            const majorCats = JSON.parse(localStorage.getItem('settingMajorCats') || '[]');
+
+            let isMajorToday = (majorDay === 'last' && isLastDay) || (majorDay == dateOfMonth && majorDay !== '');
+            let isMinorToday = (minorDay == dayOfWeek && minorDay !== '');
+
+            let activeMode = "none";
+            let activeCats = ['gel', 'nail-consumable', 'lash', 'lash-consumable', 'equipment', 'general-consumable']; 
+
+            // 若同一天撞期，以大盤點優先
+            if (isMajorToday) {
+                activeMode = "major";
+                activeCats = majorCats;
+            } else if (isMinorToday) {
+                activeMode = "minor";
+                activeCats = minorCats;
+            }
+
+            window.currentStocktakeMode = activeMode;
+            renderStocktakingPageFilters(activeMode, activeCats);
+            
+            // 觸發時間檢查來更新狀態卡片
+            if(typeof window.checkLatestTimes === 'function') {
+                window.checkLatestTimes();
+            }
+        }
+
+        // ==========================================
+        // 檢查最後盤點時間與最後新增時間
+        // ==========================================
+        window.checkLatestTimes = async function() {
+            try {
+                // 1. 取得最後一次盤點時間 (歷史紀錄中的 BATCH_SUMMARY)
+                // 移除 orderBy 避免 Firestore 複合索引報錯，改在本地進行時間排序
+                const historySnap = await db.collection("inventory_history")
+                    .where("itemId", "==", "BATCH_SUMMARY")
+                    .get();
+                
+                let lastStocktakeDate = null;
+                let lastStocktakeTimeStr = '尚無盤點紀錄';
+                
+                if (!historySnap.empty) {
+                    // 本地依照 timestamp 降冪排序，取出最新一筆
+                    const sortedDocs = historySnap.docs
+                        .map(doc => doc.data())
+                        .filter(data => data.timestamp)
+                        .sort((a, b) => b.timestamp.toMillis() - a.timestamp.toMillis());
+
+                    if (sortedDocs.length > 0) {
+                        lastStocktakeDate = sortedDocs[0].timestamp.toDate();
+                        lastStocktakeTimeStr = lastStocktakeDate.toLocaleString([], {year:'numeric', month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});
+                    }
+                }
+                
+                // 2. 取得最後一次新增項目的時間
+                const inventorySnap = await db.collection("inventory")
+                    .orderBy("createdAt", "desc")
+                    .limit(1).get();
+                
+                let lastAdditionDate = null;
+                let lastAdditionTimeStr = '無新增紀錄';
+                
+                if (!inventorySnap.empty) {
+                    const doc = inventorySnap.docs[0].data();
+                    if (doc.createdAt) {
+                        lastAdditionDate = doc.createdAt.toDate();
+                        lastAdditionTimeStr = lastAdditionDate.toLocaleString([], {year:'numeric', month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});
+                    }
+                }
+
+                // 3. 渲染畫面
+                const stocktakeEl = document.getElementById('last-stocktake-time');
+                const addContainer = document.getElementById('last-addition-container');
+                const addTimeEl = document.getElementById('last-addition-time');
+                const statusText = document.getElementById('stocktake-status-text');
+                const statusDot = document.getElementById('stocktake-status-dot');
+
+                if (stocktakeEl) stocktakeEl.innerText = lastStocktakeTimeStr;
+
+                // 判斷邏輯：新增時間是否在盤點時間「之後」
+                let hasUncountedNewItems = false;
+                let newItemsCats = new Set(); // 記錄新項目的分類
+
+                if (window.allInventoryData) {
+                    window.allInventoryData.forEach(item => {
+                        if (item.createdAt) {
+                            let itemTime = item.createdAt.toDate();
+                            if (!lastStocktakeDate || itemTime > lastStocktakeDate) {
+                                hasUncountedNewItems = true;
+                                newItemsCats.add(item.category);
+                            }
+                        }
+                    });
+                }
+
+                const todayStr = new Date().toDateString();
+                const isStocktakeToday = lastStocktakeDate && lastStocktakeDate.toDateString() === todayStr;
+
+                if (hasUncountedNewItems) {
+                    // 有新項目未盤點 -> 顯示警告，並分析類別以建議大/小盤
+                    if (addContainer) addContainer.style.display = 'block';
+                    
+                    // 比對新項目的分類是否超出「小盤點」的預設範圍
+                    const minorCats = JSON.parse(localStorage.getItem('settingMinorCats') || '["gel", "nail-consumable", "lash", "lash-consumable", "equipment", "general-consumable"]');
+                    let requiresMajor = false;
+                    newItemsCats.forEach(cat => {
+                        if (!minorCats.includes(cat)) requiresMajor = true;
+                    });
+                    
+                    const recEl = document.getElementById('new-item-recommendation');
+                    if (recEl) {
+                        recEl.innerText = requiresMajor ? "(建議進行 大盤點)" : "(建議進行 小盤點)";
+                    }
+                    
+                    if (statusText) statusText.innerText = '待盤點 (有新項目)';
+                    if (statusDot) statusDot.style.backgroundColor = '#d9534f'; // 紅燈
+                } else {
+                    // 已經都盤點過了，隱藏新增時間
+                    if (addContainer) addContainer.style.display = 'none';
+                    
+                    if (isStocktakeToday) {
+                        if (statusText) statusText.innerText = '今日已完成盤點';
+                        if (statusDot) statusDot.style.backgroundColor = '#5cb85c'; // 綠燈
+                    } else {
+                        if (statusText) statusText.innerText = '今日尚未盤點';
+                        if (statusDot) statusDot.style.backgroundColor = 'var(--gold-main)'; // 黃燈
+                    }
+                }
+            } catch (err) {
+                console.log("時間狀態檢查發生錯誤：", err.message);
+                // 發生錯誤時的防呆顯示，避免畫面一直卡在「讀取中」
+                const statusText = document.getElementById('stocktake-status-text');
+                if(statusText) statusText.innerText = '時間讀取失敗';
+                const stocktakeEl = document.getElementById('last-stocktake-time');
+                if(stocktakeEl) stocktakeEl.innerText = '讀取失敗';
+            }
+        };
+
+        // 手動觸發盤點 (由畫面按鈕呼叫)
+        window.forceStocktake = function(type) {
+            window.currentStocktakeMode = type;
+            const targetCats = type === 'major' 
+                ? JSON.parse(localStorage.getItem('settingMajorCats') || '["gel", "nail-consumable", "lash", "lash-consumable", "equipment", "general-consumable"]')
+                : JSON.parse(localStorage.getItem('settingMinorCats') || '["gel", "nail-consumable", "lash", "lash-consumable", "equipment", "general-consumable"]');
+            renderStocktakingPageFilters(type + '_forced', targetCats);
+        };
+
+        function renderStocktakingPageFilters(mode, cats) {
+            window.currentActiveCats = cats; // 記錄當前顯示的類別供防呆驗證使用
+            
+            let banner = document.getElementById('stocktaking-banner');
+            if(!banner) {
+                const stockPage = document.getElementById('page-stocktaking');
+                banner = document.createElement('div');
+                banner.id = 'stocktaking-banner';
+                stockPage.insertBefore(banner, stockPage.querySelector('#title-stock-gel')); 
+            }
+
+            const finishBtnContainer = document.getElementById('finish-stocktake-container');
+            const cancelBtn = document.getElementById('cancel-stocktake-btn');
+            const statusCard = document.getElementById('stocktake-status-card');
+
+            if (mode === 'major' || mode === 'major_forced') {
+                const titleStr = mode === 'major' ? '今日為【大盤點日】' : '您已手動啟動【大盤點】';
+                // 替換掉大紅色，改為主題墨綠色邊框
+                banner.innerHTML = `<div style="background-color: var(--card-bg); color: var(--white-main); border: 1px solid var(--white-main); padding: 12px; border-radius: 8px; margin: 16px 0; text-align: center; font-weight: bold; box-shadow: 0 4px 10px rgba(26,58,46,0.1);"> 提醒：${titleStr}<br><span style="font-size:0.85rem; font-weight:normal; color: var(--white-sec);">已為您自動篩選出應盤項目</span></div>`;
+                if(cancelBtn) cancelBtn.style.display = 'flex';
+                if(statusCard) statusCard.style.display = 'none'; // 盤點開始，隱藏狀態卡片
+                
+            } else if (mode === 'minor' || mode === 'minor_forced') {
+                const titleStr = mode === 'minor' ? '今日為【小盤點日】' : '您已手動啟動【小盤點】';
+                // 替換掉整塊金黃色，改為主題金色邊框
+                banner.innerHTML = `<div style="background-color: rgba(138, 109, 59, 0.05); color: var(--gold-main); border: 1px solid var(--gold-main); padding: 12px; border-radius: 8px; margin: 16px 0; text-align: center; font-weight: bold; box-shadow: 0 4px 10px rgba(138,109,59,0.1);"> 提醒：${titleStr}<br><span style="font-size:0.85rem; font-weight:normal; color: var(--white-sec);">已為您自動篩選出應盤項目</span></div>`;
+                if(cancelBtn) cancelBtn.style.display = 'flex';
+                if(statusCard) statusCard.style.display = 'none'; // 盤點開始，隱藏狀態卡片
+                
+            } else {
+                // none 狀態 (未排程且尚未選擇手動盤點)
+                banner.innerHTML = `
+                    <div style="background:var(--card-bg); color:var(--white-main); padding:20px; border-radius:8px; margin:16px 0; text-align:center; border: 1px solid var(--border-base);">
+                        <div style="margin-bottom:16px; font-weight:bold; font-size:1.1rem;">今日無特定盤點排程。</div>
+                        <button class="btn-primary" style="width: auto; padding: 10px 24px; display: inline-block; border: 1px solid var(--gold-main);" onclick="document.getElementById('force-options').style.display='block'; this.style.display='none';">仍要盤點</button>
+                        
+                        <div id="force-options" style="display: none; margin-top: 16px;">
+                            <button class="warning-btn" style="background-color: var(--gold-main); margin-right: 12px; padding: 12px 28px; font-size:1.1rem;" onclick="forceStocktake('minor')">小盤點</button>
+                            <!-- 替換紅色按鈕，改為墨綠色 -->
+                            <button class="warning-btn" style="background-color: var(--white-main); padding: 12px 28px; font-size:1.1rem;" onclick="forceStocktake('major')">大盤點</button>
+                        </div>
+                    </div>
+                `;
+                cats = []; 
+                if(cancelBtn) cancelBtn.style.display = 'none';
+                if(statusCard) statusCard.style.display = 'block'; // 退回首頁狀態，將狀態卡片放回來
+            }
+
+            // 確保每次切換模式時，預設先隱藏完成按鈕，並執行一次檢查
+            if(finishBtnContainer) finishBtnContainer.style.display = 'none';
+            if (typeof window.checkAllCountedStatus === 'function') {
+                window.checkAllCountedStatus();
+            }
+
+            // 對照表：決定哪些標題與列表該顯示或隱藏
+            const groupMap = {
+                'gel': ['title-stock-gel', 'stocktaking-gel'],
+                'nail-consumable': ['title-stock-nail-consumable', 'stocktaking-nail-consumable'],
+                'lash': ['title-stock-lash', 'stocktaking-lash'],
+                'lash-consumable': ['title-stock-lash-consumable', 'stocktaking-lash-consumable'],
+                'equipment': ['title-stock-equipment', 'stocktaking-equipment'],
+                'general-consumable': ['title-stock-general', 'stocktaking-general']
+            };
+
+            for(let key in groupMap) {
+                const titleEl = document.getElementById(groupMap[key][0]);
+                const listEl = document.getElementById(groupMap[key][1]);
+                if (titleEl && listEl) {
+                    if (cats.includes(key)) {
+                        titleEl.style.display = 'block';
+                        listEl.style.display = 'flex';
+                    } else {
+                        titleEl.style.display = 'none';
+                        listEl.style.display = 'none';
+                    }
+                }
+            }
+        }
+
+        // ==========================================
+        // 完成盤點總結與驗證
+        // ==========================================
+        window.submitStocktakeSummary = function() {
+            // 找出本次盤點畫面中應顯示的所有項目
+            const requiredItems = window.allInventoryData.filter(item => window.currentActiveCats.includes(item.category));
+            
+            // 檢查是否所有需盤點的項目都在「已打勾名單 (countedSet)」中
+            const uncountedItems = requiredItems.filter(item => !window.countedSet.has(item.id));
+            
+            if (uncountedItems.length > 0) {
+                alert(`⚠️ 還有 ${uncountedItems.length} 個項目尚未打勾確認！\n請將畫面上所有項目的「✓」都點擊變綠後，再完成盤點。`);
+                return;
+            }
+
+            // 全部打勾後觸發完成確認
+            if (confirm("今日盤點已完成，是否要將盤點結果同步至雲端資料庫？")) {
+                const modeText = window.currentStocktakeMode.includes('major') ? '大盤點' : '小盤點';
+                
+                // 組合所有項目的匯總清單字串 (如: 紅色凝膠(5)、直夾(2)...)
+                const summaryList = requiredItems.map(item => `${item['名稱']}(${item['庫存'] || 0})`).join('、');
+                
+                // 寫入一筆統整性的歷史紀錄至雲端
+                db.collection("inventory_history").add({
+                    itemId: 'BATCH_SUMMARY',
+                    itemName: `【完成 ${modeText}】`,
+                    changeAmount: 0,
+                    newStock: 0,
+                    user: currentUser ? currentUser.email : '未登入訪客',
+                    reason: `共盤點 ${requiredItems.length} 項：\n${summaryList}`,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                }).then(() => {
+                    alert(" 盤點結果已成功同步至雲端資料庫！");
+                    
+                    // 清空本次盤點的打勾記憶
+                    window.countedSet.clear(); 
+                    
+                    // 重新刷新排程狀態(讓無排程的畫面變回預設)，並跳轉回首頁
+                    checkTodayStocktaking();
+                    switchPage('page-home');
+                    
+                    // 強制洗掉畫面上所有綠色的打勾樣式，避免下次盤點時殘留
+                    document.querySelectorAll('.stocktaking-card').forEach(card => {
+                        card.classList.remove('counted-item');
+                        card.style.order = '0';
+                        const btn = card.querySelector('button');
+                        if(btn) {
+                            btn.style.backgroundColor = 'transparent';
+                            btn.style.color = 'var(--white-sec)';
+                            btn.style.border = '1px solid var(--white-sec)';
+                        }
+                    });
+                }).catch(err => {
+                    alert("同步失敗：" + err.message);
+                });
+            }
+        };
+
+        // 監聽器：當整個網頁元素都準備好後，自動初始化排程設定並檢查今天是否要盤點
+        window.addEventListener('DOMContentLoaded', () => {
+            loadScheduleSettings();
+            checkTodayStocktaking();
+        });
+
+    </script>
+</body>
+</html>
