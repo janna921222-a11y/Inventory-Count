@@ -2038,11 +2038,21 @@
         function generateICS(minorDay, majorDay) {
             let icsMSG = "BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//MeawMeBeauty//Stocktaking//TW\n";
             const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            const todayStr = `${year}${month}${day}`;
+            
+            // 為了符合 ICS 行事曆標準並允許更新，必須加上 DTSTAMP (目前時間的 UTC 格式)
+            const dtstamp = now.toISOString().replace(/[-:]/g, '').split('.')[0] + "Z";
             
             // 處理小盤點 (每週)
             if (minorDay !== "") {
                 icsMSG += "BEGIN:VEVENT\n";
-                icsMSG += `DTSTART:${now.toISOString().replace(/[-:]/g, '').split('.')[0]}Z\n`;
+                // 加上固定的 UID，手機行事曆讀到相同 UID 就會自動覆蓋舊紀錄
+                icsMSG += `UID:minor-stocktake@meawmebeauty.app\n`; 
+                icsMSG += `DTSTAMP:${dtstamp}\n`;
+                icsMSG += `DTSTART;VALUE=DATE:${todayStr}\n`;
                 const days = ["SU", "MO", "TU", "WE", "TH", "FR", "SA"];
                 icsMSG += `RRULE:FREQ=WEEKLY;BYDAY=${days[minorDay] || "MO"}\n`;
                 icsMSG += "SUMMARY:繆米美學 - 每週小盤點\n";
@@ -2053,7 +2063,10 @@
             // 處理大盤點 (每月)
             if (majorDay !== "") {
                 icsMSG += "BEGIN:VEVENT\n";
-                icsMSG += `DTSTART:${now.toISOString().replace(/[-:]/g, '').split('.')[0]}Z\n`;
+                // 加上固定的 UID，手機行事曆讀到相同 UID 就會自動覆蓋舊紀錄
+                icsMSG += `UID:major-stocktake@meawmebeauty.app\n`; 
+                icsMSG += `DTSTAMP:${dtstamp}\n`;
+                icsMSG += `DTSTART;VALUE=DATE:${todayStr}\n`;
                 let rrule = majorDay === 'last' ? 'FREQ=MONTHLY;BYMONTHDAY=-1' : `FREQ=MONTHLY;BYMONTHDAY=${majorDay}`;
                 icsMSG += `RRULE:${rrule}\n`;
                 icsMSG += "SUMMARY:繆米美學 - 每月大盤點\n";
