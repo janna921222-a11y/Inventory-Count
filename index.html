@@ -1451,12 +1451,17 @@
                 .then((docRef) => {
                     alert(`成功新增：${newItem['名稱']}`);
                     
-                    // 僅清空剛填寫的各個輸入框，保留主分類，不跳轉頁面
+                    // 僅清空「庫存」欄位，其餘保留原值
                     inputs.forEach(input => {
-                        if (input.tagName === 'SELECT') {
-                            input.selectedIndex = 0; 
-                        } else {
-                            input.value = ''; 
+                        const parentDiv = input.closest('.form-group');
+                        if (parentDiv) {
+                            const labelElement = parentDiv.querySelector('label');
+                            if (labelElement) {
+                                const labelName = labelElement.innerText.replace(' (非必填)', '').trim();
+                                if (labelName === '庫存') {
+                                    input.value = ''; 
+                                }
+                            }
                         }
                     });
                     
